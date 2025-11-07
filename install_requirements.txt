@@ -32,6 +32,18 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin 
 
 sudo systemctl status docker
 
+####
+# If manual start is required
+####
+
+sudo systemctl start docker
+
+####
+# Verify by running hello-world image
+####
+
+sudo docker run hello-world
+
 
 ##########################################
 # Containerlab setup
