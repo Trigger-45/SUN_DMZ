@@ -223,7 +223,7 @@ topology:
     - endpoints: ["Internal_FW:eth2", "DMZ_Switch:eth1"]
     - endpoints: ["DMZ_Switch:eth2", "External_FW:eth1"]
     - endpoints: ["Proxy_WAF:eth1", "DMZ_Switch:eth3"]
-    - endpoints: ["Database:eth2", "Webserver:eth2"]
+    - endpoints: ["Database:eth1", "Webserver:eth2"]
     - endpoints: ["Proxy_WAF:eth2", "Webserver:eth1"]
     - endpoints: ["IDS:eth1", "DMZ_Switch:eth4"]
     - endpoints: ["IDS:eth2", "filebeat:eth1"]
