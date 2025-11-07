@@ -9,6 +9,16 @@ Das Skript erstellt und konfiguriert alle Komponenten, vernetzt sie logisch, und
 
 ---
 
+---
+
+## 🗺️ Netzwerk-Topologie
+
+Die folgende Abbildung zeigt die logische Struktur der DMZ-Umgebung mit allen zentralen Komponenten und Netzwerkzonen:
+
+![DMZ Topologie](diagramm.png)
+
+---
+
 ## ⚙️ Systemübersicht
 
 ### 🧩 Komponenten der DMZ
