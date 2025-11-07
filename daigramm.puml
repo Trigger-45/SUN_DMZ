@@ -1,0 +1,59 @@
+@startuml
+' Simple network-style diagram for PlantUML (updated)
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam rectangle {
+  StereotypeFontColor #222222
+}
+
+actor "Internet Attacker" as Attacker
+
+package "Edge Gateway\n(Edge Router + External Firewall)\n10.0.2.1 / 10.0.3.1\n(iptables)" #F4BFBF {
+  node EdgeGW as "Edge Gateway\n(Trunk Port)"
+}
+
+package "DMZ Zone\n10.0.3.0/24" #DFF2D8 {
+  node DMZ_Switch as "DMZ Switch\nManaged L3 Switch"
+  node ReverseProxy as "Reverse Proxy + WAF\n(NGINX + ModSecurity)" #FFF2B8
+  node Webserver as "Webserver\n(NGINX)" #D8F2E
+  node Database as "Database" #D8F2EA
+  node IDS as "IDS (Suricata)\nMirror Port\n(Port Mirror from Switch)" #EFEFEF
+}
+
+package "Internal Gateway (Router + Firewall)" #F4BFBF {
+   node Internal_Gateway as "Internal Gateway\n(Internal Router + Firewall)\n10.0.4.1 / 10.0.3.254\n(iptables)"
+}
+
+package "Internal Zone\n10.0.4.0/24" #DCEBFF {
+  node Internal_Client as "Internal Client\n10.0.4.x"
+  node Internal_Client2 as "Internal Client2\n10.0.4.x"
+  node Internal_Switch as "Internal Switch\n10.0.4.x"
+  node Internal_IDS as "IDS (Suricata)\nMirror Port\n(Port Mirror from Switch)" #EFEFEF
+}
+
+package "Backend Zone\n10.0.5.0/24" #E9D6FF {
+  node SIEM as "SIEM\n10.0.5.x"
+}
+
+' Connections / Flows (ungerichtet / als Verbindungen ohne doppelte Linien)
+Attacker -- EdgeGW : Angriff
+EdgeGW -- DMZ_Switch : Trunk 
+ReverseProxy -- DMZ_Switch : Access 
+Webserver -- ReverseProxy
+Webserver -- Database: read only
+DMZ_Switch -- IDS : Port Mirror
+DMZ_Switch -- Internal_Gateway : Trunk
+Internal_Client -- Internal_Switch : Direct Connection 
+Internal_Client2 -- Internal_Switch : Direct Connection 
+Internal_Switch -- Internal_Gateway
+Internal_IDS -- Internal_Switch : Port Mirror
+Internal_Gateway -- SIEM : Logs / Direct Connection (10.0.5.0/24)
+ReverseProxy -- SIEM : WAF Events
+IDS -- SIEM : Alerts
+Internal_IDS -- SIEM : Alerts
+EdgeGW -- SIEM : (optional) Logs
+' Entfernt: Verbindung zwischen SIEM und der Legende/Note (Legende ist jetzt unabhängig)
+
+
+@enduml
