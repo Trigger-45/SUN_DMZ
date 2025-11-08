@@ -370,7 +370,10 @@ log_ok "Internal Firewall configured"
 # Firewall: External_FW
 log_info "Configuring External Firewall"
 sudo docker exec -i clab-MaJuVi-External_FW sh <<'EOF'
-# Basic interface up (may be no-op depending on image)
+set -e 
+apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
+ip addr add 10.0.2.2/24 dev eth1 || true
+ip addr add 172.168.3.2/30 dev eth2 || true
 ip link set eth1 up || true
 ip link set eth2 up || true
 
@@ -381,6 +384,9 @@ iptables -F
 iptables -P FORWARD ACCEPT || true
 # ensure counters exist for monitoring
 iptables -L -v -n --line-numbers || true
+
+ip route replace 172.168.1.0/24 via 172.168.3.1 || true
+
 EOF
 log_ok "External Firewall configured"
 
@@ -498,5 +504,73 @@ ip route replace default via 172.168.1.1 || true
 EOF
 log_ok "Attacker configured"
 
+
+log_info "Configuring router-internet"
+sudo docker exec -i clab-MaJuVi-router-internet sh <<'EOF'
+set -e
+# sicherstellen, dass iproute2 vorhanden ist
+if command -v apt >/dev/null 2>&1; then
+  apt update >/dev/null 2>&1 || true
+  apt install -y iproute2 iputils-ping >/dev/null 2>&1 || true
+elif command -v apk >/dev/null 2>&1; then
+  apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
+fi
+
+# Interfaces: eth1 <-> Attacker, eth2 <-> router-edge
+ip addr add 172.168.1.1/24 dev eth1 || true
+ip addr add 172.168.2.1/30 dev eth2 || true
+
+ip link set eth1 up
+ip link set eth2 up
+
+# forwarding aktivieren
+echo 1 > /proc/sys/net/ipv4/ip_forward || true
+
+# Kleine Firewall-Grundregeln (erlaubt established/related)
+iptables -F
+iptables -P FORWARD DROP
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
+
+# Route: DMZ (10.0.2.0/24) via router-edge (172.168.2.2)
+ip route replace 10.0.2.0/24 via 172.168.2.2 || true
+EOF
+log_ok "router-internet configured"
+
+log_info "Configuring router-edge"
+sudo docker exec -i clab-MaJuVi-router-edge sh <<'EOF'
+set -e
+if command -v apt >/dev/null 2>&1; then
+  apt update >/dev/null 2>&1 || true
+  apt install -y iproute2 iputils-ping >/dev/null 2>&1 || true
+elif command -v apk >/dev/null 2>&1; then
+  apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
+fi
+
+# Interfaces: eth1 <-> router-internet, eth2 <-> External_FW
+ip addr add 172.168.2.2/30 dev eth1 || true
+ip addr add 172.168.3.1/30 dev eth2 || true
+
+ip link set eth1 up
+ip link set eth2 up
+
+# forwarding aktivieren
+echo 1 > /proc/sys/net/ipv4/ip_forward || true
+
+# Firewall-Grundregeln
+iptables -F
+iptables -P FORWARD DROP
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
+
+# Routen:
+# - Netzwerk zum Attacker (172.168.1.0/24) via router-internet
+ip route replace 172.168.1.0/24 via 172.168.2.1 || true
+# - DMZ (10.0.2.0/24) via External_FW (172.168.3.2)
+ip route replace 10.0.2.0/24 via 172.168.3.2 || true
+EOF
+log_ok "router-edge configured"
+
 log_ok "### Lab deployment and configuration completed"
-log_info "Wichtig: In Kibana Index-Pattern 'filebeat-*' anlegen (oder das automatisch erstellte Filebeat-Index-Template nutzen). Firewall-Logs haben das Feld 'log_type: firewall'."
