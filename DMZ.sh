@@ -42,6 +42,7 @@ log_ok "Previous environment cleaned"
 
 # =========================
 # Create topology file
+# (unchanged, benutze deine bestehende Topologie)
 # =========================
 log_info "Creating topology file: ${file_name}"
 cat << 'EOF' > "$file_name"
@@ -211,6 +212,7 @@ topology:
     - endpoints: ["Internal_Client2:eth1", "Internal_Switch:eth2"]
     - endpoints: ["Internal_Switch:eth3", "Internal_FW:eth1"]
     - endpoints: ["Internal_FW:eth2", "DMZ_Switch:eth1"]
+    - endpoints: ["Internal_FW:eth3", "External_FW:eth4"]
     - endpoints: ["DMZ_Switch:eth2", "External_FW:eth1"]
     - endpoints: ["Proxy_WAF:eth1", "DMZ_Switch:eth3"]
     - endpoints: ["Database:eth1", "DMZ_Switch:eth4"]
@@ -225,7 +227,7 @@ topology:
     - endpoints: ["router-edge:eth2", "External_FW:eth2"]
     - endpoints: ["IDS2:eth1", "Internal_Switch:eth4"]
     - endpoints: ["IDS2:eth2", "filebeat:eth3"]
-    - endpoints: ["filebeat:eth4", "Internal_FW:eth3"]
+    - endpoints: ["filebeat:eth4", "Internal_FW:eth4"]
     - endpoints: ["filebeat:eth5", "External_FW:eth3"]
     - endpoints: ["filebeat:eth6", "Proxy_WAF:eth3"]
 EOF
@@ -336,64 +338,127 @@ log_ok "Continuous log generation started"
 
 # =========================
 # Firewall: ensure ip forwarding + iptables base rules (Internal_FW)
+# - Internal -> DMZ allowed (NEW)
+# - DMZ -> Internal NEW blocked
 # =========================
 log_info "Configuring Internal Firewall"
 sudo docker exec -i clab-MaJuVi-Internal_FW sh <<'EOF'
-ip addr add 192.168.10.1/24 dev eth1 || true
-ip addr add 10.0.2.1/24 dev eth2 || true
+set -e
+# Interfaces
+ip addr add 192.168.10.1/24 dev eth1   # intern
+ip addr add 10.0.2.1/24 dev eth2       # DMZ
+ip addr add 192.168.20.1/24 dev eth3   # direct link to External_FW (peer 192.168.20.2)
 ip link set eth1 up
 ip link set eth2 up
+ip link set eth3 up
 
 # Enable forwarding
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
-# Grundregeln 
+# Flush rules
 iptables -F
+iptables -t nat -F
 iptables -P FORWARD DROP
+
+# Base rules
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# Allow internal -> DMZ (beachtet: NEW nur in diese Richtung)
+# --- Internal → DMZ (NEW allowed)
 iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
+
+# --- DMZ → Internal: only RELATED/ESTABLISHED
 iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j DROP
 
-# Add a counted logging rule (doesn't log to file, but we will export counters)
-iptables -N LOGGING || true
-iptables -F LOGGING || true
-iptables -A LOGGING -j RETURN
+# --- Internal → Internet (via eth3)
+# allow NEW from internal network to go out on eth3 (towards External_FW)
+iptables -A FORWARD -i eth1 -o eth3 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -i eth3 -o eth1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
-# make sure there are counters to read
-iptables -I FORWARD 1 -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT || true
+# NOTE: NO NAT here for 192.168.10.0/24 — NAT will be done on External_FW
+# (remove/avoid any MASQUERADE on Internal_FW)
+
+# Optional logging DMZ → Internal NEW
+iptables -N DMZ_TO_INTERNAL_LOG || true
+iptables -A DMZ_TO_INTERNAL_LOG -m limit --limit 5/min -j LOG --log-prefix "DMZ->INT BLOCK: " --log-level 4
+iptables -A DMZ_TO_INTERNAL_LOG -j RETURN
+iptables -I FORWARD 1 -i eth2 -o eth1 -m conntrack --ctstate NEW -j DMZ_TO_INTERNAL_LOG
+
+# ------------------------------------------------------------------
+# Routing so Internal_FW forwards toward External_FW for router/edge subnets
+# send traffic for 172.168.2.0/30 (router-internet) via External_FW (192.168.20.2)
+# and also route to 172.168.3.0/30 (router-edge) via External_FW
+# ------------------------------------------------------------------
+ip route replace 172.168.2.0/30 via 192.168.20.2 dev eth3 || true
+ip route replace 172.168.3.0/30 via 192.168.20.2 dev eth3 || true
+
+# If you prefer External_FW to be default gateway for everything outside internal nets,
+# uncomment the next line (instead of adding many specific routes)
+# ip route replace default via 192.168.20.2 dev eth3 || true
+
 EOF
 log_ok "Internal Firewall configured"
 
 # =========================
 # Firewall: External_FW
+# - NAT (MASQUERADE) für ausgehenden Verkehr zur 'Internet'-Schnittstelle (eth2)
+# - DMZ -> Internet erlaubt
+# - Internet -> DMZ/Internal (NEW) explicit DROP
+# =========================
 log_info "Configuring External Firewall"
 sudo docker exec -i clab-MaJuVi-External_FW sh <<'EOF'
-set -e 
-apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
-ip addr add 10.0.2.2/24 dev eth1 || true
-ip addr add 172.168.3.2/30 dev eth2 || true
-ip link set eth1 up || true
-ip link set eth2 up || true
+set -e
+# Interfaces
+ip addr add 10.0.2.2/24 dev eth1      # DMZ
+ip addr add 172.168.3.2/30 dev eth2    # Router Edge (towards router-edge 172.168.3.1)
+ip addr add 192.168.20.2/24 dev eth4   # link from Internal_FW (peer 192.168.20.1)
+ip link set eth1 up
+ip link set eth2 up
+ip link set eth4 up
 
-# Enable forwarding
-echo 1 > /proc/sys/net/ipv4/ip_forward || true
+echo 1 > /proc/sys/net/ipv4/ip_forward
 
+# Flush rules
 iptables -F
-iptables -P FORWARD ACCEPT || true
-# ensure counters exist for monitoring
-iptables -L -v -n --line-numbers || true
+iptables -t nat -F
+iptables -P FORWARD DROP
 
-ip route replace 172.168.1.0/24 via 172.168.3.1 || true
+# Base: allow RELATED/ESTABLISHED
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
+# --- DMZ → Internet (NEW)
+iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+
+# --- Internal_FW direct → Internet (NEW)
+# allow NEW coming from Internal_FW (eth4) to be forwarded out to the edge (eth2)
+iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+# allow return traffic
+iptables -A FORWARD -i eth2 -o eth4 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# --- NAT outgoing on External_FW for internal and DMZ networks
+# MASQUERADE traffic that leaves via eth2 (towards router-edge/internet)
+iptables -t nat -A POSTROUTING -o eth2 -s 192.168.10.0/24 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.0/24 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o eth2 -s 192.168.20.0/24 -j MASQUERADE
+
+# --- Drop any NEW from Internet → DMZ/Internal (protecting DMZ/Internal)
+iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j DROP
+iptables -A FORWARD -i eth2 -o eth4 -m conntrack --ctstate NEW -j DROP
+
+# Optional: logging for dropped NEWs from Internet
+iptables -N INET_TO_LAN_DROP_LOG || true
+iptables -A INET_TO_LAN_DROP_LOG -m limit --limit 5/min -j LOG --log-prefix "INET->LAN DROP: " --log-level 4
+iptables -A INET_TO_LAN_DROP_LOG -j RETURN
+iptables -I FORWARD 1 -i eth2 -m conntrack --ctstate NEW -j INET_TO_LAN_DROP_LOG
+
+ip route replace 172.168.2.0/30 via 172.168.3.1 dev eth2 || true
+ip route replace 192.168.10.0/24 via 192.168.20.1 dev eth4 || true
 EOF
 log_ok "External Firewall configured"
+
 
 # =========================
 # Create background host-side tasks that poll iptables/stats from the firewall containers
 # and write them into host /tmp/filebeat-simulated-logs/fw_*.log so that Filebeat picks them up.
-# This approach is robust for a test lab: the host polls the container and stores the output on the host.
 # =========================
 
 log_info "Starting host-side firewall loggers (poll iptables counters and write to host logs)..."
@@ -401,7 +466,7 @@ log_info "Starting host-side firewall loggers (poll iptables counters and write 
 # Internal FW logger (runs on host, polling the firewall container)
 sudo bash -c 'nohup bash -c \
 "while true; do
-  echo \"$(date -u +\"%Y-%m-%d %H:%M:%S UTC\") - >>> INTERNAL_FW IPTABLES FORWARD (top 20 lines)\" >> /tmp/filebeat-simulated-logs/fw_internal.log
+  echo \"$(date -u +\"%Y-%m-%d %H:%M:%S UTC\") - >>> INTERNAL_FW IPTABLES FORWARD (top 40 lines)\" >> /tmp/filebeat-simulated-logs/fw_internal.log
   sudo docker exec clab-MaJuVi-Internal_FW iptables -L FORWARD -v -n --line-numbers | sed -n \"1,40p\" >> /tmp/filebeat-simulated-logs/fw_internal.log 2>/dev/null || echo \"(unable to query iptables inside container)\" >> /tmp/filebeat-simulated-logs/fw_internal.log
   echo \"\" >> /tmp/filebeat-simulated-logs/fw_internal.log
   sleep 5
@@ -410,7 +475,7 @@ done" >/tmp/fw_internal_logger.out 2>&1 &'
 # External FW logger (similar)
 sudo bash -c 'nohup bash -c \
 "while true; do
-  echo \"$(date -u +\"%Y-%m-%d %H:%M:%S UTC\") - >>> EXTERNAL_FW IPTABLES FORWARD (top 20 lines)\" >> /tmp/filebeat-simulated-logs/fw_external.log
+  echo \"$(date -u +\"%Y-%m-%d %H:%M:%S UTC\") - >>> EXTERNAL_FW IPTABLES FORWARD (top 40 lines)\" >> /tmp/filebeat-simulated-logs/fw_external.log
   sudo docker exec clab-MaJuVi-External_FW iptables -L FORWARD -v -n --line-numbers | sed -n \"1,40p\" >> /tmp/filebeat-simulated-logs/fw_external.log 2>/dev/null || echo \"(unable to query iptables inside container)\" >> /tmp/filebeat-simulated-logs/fw_external.log
   echo \"\" >> /tmp/filebeat-simulated-logs/fw_external.log
   sleep 5
@@ -419,18 +484,20 @@ done" >/tmp/fw_external_logger.out 2>&1 &'
 log_ok "Firewall loggers started (host-side pollers writing into /tmp/filebeat-simulated-logs/)"
 
 # =========================
-# Internal Clients (no change)
+# Internal Clients (IP + default route)
 # =========================
 log_info "Configuring Internal Clients..."
 sudo docker exec -i clab-MaJuVi-Internal_Client1 sh <<EOF
-ip addr add ${Internal_Client1_ip} dev eth1
+echo '172.168.2.1    internet' >> /etc/hosts
+ip addr add ${Internal_Client1_ip} dev eth1 || true
 ip link set eth1 up
-ip route replace default via 192.168.10.1
+ip route replace default via 192.168.10.1 || true
 EOF
 sudo docker exec -i clab-MaJuVi-Internal_Client2 sh <<EOF
-ip addr add ${Internal_Client2_ip} dev eth1
+echo '172.168.2.1    internet' >> /etc/hosts
+ip addr add ${Internal_Client2_ip} dev eth1 || true
 ip link set eth1 up
-ip route replace default via 192.168.10.1
+ip route replace default via 192.168.10.1 || true
 EOF
 log_ok "Internal Clients configured"
 
@@ -451,10 +518,10 @@ ip link set eth2 up
 ip link set eth3 up
 EOF
 
-log_ok "Internal Switch configerd"
+log_ok "Internal Switch configured"
 
 # =========================
-# DMZ Switch config (same as before)
+# DMZ Switch config
 # =========================
 log_info "Konfiguriere DMZ Switch (br0) ..."
 sudo docker exec -i clab-MaJuVi-DMZ_Switch sh <<'EOF'
@@ -474,7 +541,7 @@ EOF
 log_ok "DMZ Switch konfiguriert"
 
 # =========================
-# Database config (same)
+# Database config
 # =========================
 log_info "Configuring Database"
 sudo docker exec -i clab-MaJuVi-Database sh <<'EOF'
@@ -493,31 +560,35 @@ EOF
 log_ok "Database configured"
 
 # =========================
-# Attacker (same)
+# Attacker host config (netzwerkseitig)
 # =========================
 log_info "Configuring Attacker"
 sudo docker exec -i clab-MaJuVi-Attacker sh <<EOF
 set -e
-ip addr add 172.168.1.10/24 dev eth1 || true
+ip addr add 200.168.1.10/24 dev eth1 || true
 ip link set eth1 up
-ip route replace default via 172.168.1.1 || true
+ip route replace default via 200.168.1.1 || true
 EOF
 log_ok "Attacker configured"
 
-
+# =========================
+# router-internet configuration
+# - Drop NEW destined to DMZ/INTERNAL from Attacker link (eth1)
+# - Otherwise allow established/related
+# =========================
 log_info "Configuring router-internet"
 sudo docker exec -i clab-MaJuVi-router-internet sh <<'EOF'
 set -e
-# sicherstellen, dass iproute2 vorhanden ist
+# ensure tooling
 if command -v apt >/dev/null 2>&1; then
   apt update >/dev/null 2>&1 || true
-  apt install -y iproute2 iputils-ping >/dev/null 2>&1 || true
+  apt install -y iproute2 iputils-ping iptables >/dev/null 2>&1 || true
 elif command -v apk >/dev/null 2>&1; then
-  apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
+  apk add --no-cache iproute2 iputils iptables >/dev/null 2>&1 || true
 fi
 
 # Interfaces: eth1 <-> Attacker, eth2 <-> router-edge
-ip addr add 172.168.1.1/24 dev eth1 || true
+ip addr add 200.168.1.1/24 dev eth1 || true
 ip addr add 172.168.2.1/30 dev eth2 || true
 
 ip link set eth1 up
@@ -526,51 +597,74 @@ ip link set eth2 up
 # forwarding aktivieren
 echo 1 > /proc/sys/net/ipv4/ip_forward || true
 
-# Kleine Firewall-Grundregeln (erlaubt established/related)
+# Disable rp_filter (testweise, vermeidet unerwartete Drops)
+sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1 || true
+sysctl -w net.ipv4.conf.default.rp_filter=0 >/dev/null 2>&1 || true
+sysctl -w net.ipv4.conf.eth1.rp_filter=0 >/dev/null 2>&1 || true
+sysctl -w net.ipv4.conf.eth2.rp_filter=0 >/dev/null 2>&1 || true
+
+# Base firewall: flush, default drop, allow established/related
 iptables -F
 iptables -P FORWARD DROP
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
+
+# Allow router-side initiated NEW connections to Attacker (eth2 -> eth1)
 iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
 
-# Route: DMZ (10.0.2.0/24) via router-edge (172.168.2.2)
+# Explicitly drop any NEW from Attacker side (eth1) aimed at DMZ (10.0.2.0/24) or Internal (192.168.10.0/24)
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.0/24 -m conntrack --ctstate NEW -j DROP
+iptables -A FORWARD -i eth1 -o eth2 -d 192.168.10.0/24 -m conntrack --ctstate NEW -j DROP
+
+# Ensure routes for lab networks (so router-internet knows how to reach DMZ/Internal)
+# next-hop is router-edge (172.168.2.2)
 ip route replace 10.0.2.0/24 via 172.168.2.2 || true
+ip route replace 192.168.10.0/24 via 172.168.2.2 || true
+# route to attacker network (locally attached already, but keep explicit)
+ip route replace 200.168.1.0/24 dev eth1 || true
+ip route replace 172.168.3.2 via 172.168.2.2 dev eth2
+
+# Debug
+iptables -L -v -n --line-numbers || true
+ip -4 route show || true
 EOF
 log_ok "router-internet configured"
 
+
+# =========================
+# router-edge configuration
+# - make sure it routes DMZ and internal networks via External_FW
+# =========================
+# router-edge configuration
 log_info "Configuring router-edge"
 sudo docker exec -i clab-MaJuVi-router-edge sh <<'EOF'
 set -e
-if command -v apt >/dev/null 2>&1; then
-  apt update >/dev/null 2>&1 || true
-  apt install -y iproute2 iputils-ping >/dev/null 2>&1 || true
-elif command -v apk >/dev/null 2>&1; then
-  apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
-fi
-
-# Interfaces: eth1 <-> router-internet, eth2 <-> External_FW
-ip addr add 172.168.2.2/30 dev eth1 || true
-ip addr add 172.168.3.1/30 dev eth2 || true
-
+# Interfaces
+ip addr add 172.168.2.2/30 dev eth1  # from router-internet
+ip addr add 172.168.3.1/30 dev eth2  # to External_FW
 ip link set eth1 up
 ip link set eth2 up
 
-# forwarding aktivieren
-echo 1 > /proc/sys/net/ipv4/ip_forward || true
+echo 1 > /proc/sys/net/ipv4/ip_forward
 
-# Firewall-Grundregeln
+# Flush rules
 iptables -F
 iptables -P FORWARD DROP
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+# Allow NEW traffic to/from Internet via eth1/eth2
 iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
 iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
 
-# Routen:
-# - Netzwerk zum Attacker (172.168.1.0/24) via router-internet
-ip route replace 172.168.1.0/24 via 172.168.2.1 || true
-# - DMZ (10.0.2.0/24) via External_FW (172.168.3.2)
-ip route replace 10.0.2.0/24 via 172.168.3.2 || true
+# --- Prevent Internal → Attacker (eth1) directly
+iptables -I FORWARD 1 -s 192.168.10.0/24 -d 200.168.1.0/24 -m conntrack --ctstate NEW -j DROP
+
+# Routing
+ip route replace 10.0.2.0/24 via 172.168.3.2
+ip route replace 192.168.10.0/24 via 172.168.3.2
+ip route replace 200.168.1.0/24 via 172.168.2.1
 EOF
 log_ok "router-edge configured"
+
+
 
 log_ok "### Lab deployment and configuration completed"
