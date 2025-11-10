@@ -1,5 +1,8 @@
 @startuml
-' Simple network-style diagram for PlantUML (updated)
+' ============================================================
+' PlantUML: Unternehmensnetzwerk – Komponenten einzeln dargestellt
+' ============================================================
+
 skinparam componentStyle rectangle
 skinparam linetype ortho
 skinparam shadowing false
@@ -9,51 +12,101 @@ skinparam rectangle {
 
 actor "Internet Attacker" as Attacker
 
-package "Edge Gateway\n(Edge Router + External Firewall)\n10.0.2.1 / 10.0.3.1\n(iptables)" #F4BFBF {
-  node EdgeGW as "Edge Gateway\n(Trunk Port)"
+' ===================== INTERNET-BEREICH =====================
+package "Internet Zone\n172.168.2.0/30" #FFF2F2 {
+  node Router_Internet as "Router-Internet\n172.168.2.1"
 }
 
-package "DMZ Zone\n10.0.3.0/24" #DFF2D8 {
+package "Edge Zone\n172.168.3.0/30" #FFE9E9 {
+  node Router_Edge as "Router-Edge\n172.168.3.1"
+}
+
+' ===================== EXTERNE FIREWALL =====================
+package "External Firewall\nEdge Firewall\n(iptables)\n172.168.3.2 / 10.0.2.1 / 192.168.20.2" #F4BFBF {
+  node External_FW as "External Firewall"
+}
+
+' ===================== DMZ =====================
+package "DMZ Zone\n10.0.2.0/24" #DFF2D8 {
   node DMZ_Switch as "DMZ Switch\nManaged L3 Switch"
   node ReverseProxy as "Reverse Proxy + WAF\n(NGINX + ModSecurity)" #FFF2B8
-  node Webserver as "Webserver\n(NGINX)" #D8F2E
-  node Database as "Database" #D8F2EA
-  node IDS as "IDS (Suricata)\nMirror Port\n(Port Mirror from Switch)" #EFEFEF
+  node Webserver as "Webserver\n(NGINX)" #E8F2F8
+  node Database as "Database\nMariaDB" #E8F2EA
+  node DMZ_IDS as "IDS (Suricata)\nMirror Port" #EFEFEF
 }
 
-package "Internal Gateway (Router + Firewall)" #F4BFBF {
-   node Internal_Gateway as "Internal Gateway\n(Internal Router + Firewall)\n10.0.4.1 / 10.0.3.254\n(iptables)"
+' ===================== INTERNE FIREWALL =====================
+package "Internal Firewall\n(iptables)\n192.168.10.1 / 10.0.2.254 / 192.168.20.1" #F4BFBF {
+  node Internal_FW as "Internal Firewall"
 }
 
-package "Internal Zone\n10.0.4.0/24" #DCEBFF {
-  node Internal_Client as "Internal Client\n10.0.4.x"
-  node Internal_Client2 as "Internal Client2\n10.0.4.x"
-  node Internal_Switch as "Internal Switch\n10.0.4.x"
-  node Internal_IDS as "IDS (Suricata)\nMirror Port\n(Port Mirror from Switch)" #EFEFEF
+' ===================== INTERNES NETZ =====================
+package "Internal Zone\n192.168.10.0/24" #DCEBFF {
+  node Internal_Switch as "Internal Switch"
+  node Internal_Client1 as "Internal Client 1"
+  node Internal_Client2 as "Internal Client 2"
+  node Internal_IDS as "IDS (Suricata)\nMirror Port" #EFEFEF
 }
 
+' ===================== BACKEND / SIEM =====================
 package "Backend Zone\n10.0.5.0/24" #E9D6FF {
-  node SIEM as "SIEM\n10.0.5.x"
+  node SIEM as "SIEM / Logserver\n10.0.5.x"
 }
 
-' Connections / Flows (ungerichtet / als Verbindungen ohne doppelte Linien)
-Attacker -- EdgeGW : Angriff
-EdgeGW -- DMZ_Switch : Trunk 
-ReverseProxy -- DMZ_Switch : Access 
-Webserver -- ReverseProxy
-Webserver -- Database: read only
-DMZ_Switch -- IDS : Port Mirror
-DMZ_Switch -- Internal_Gateway : Trunk
-Internal_Client -- Internal_Switch : Direct Connection 
-Internal_Client2 -- Internal_Switch : Direct Connection 
-Internal_Switch -- Internal_Gateway
-Internal_IDS -- Internal_Switch : Port Mirror
-Internal_Gateway -- SIEM : Logs / Direct Connection (10.0.5.0/24)
-ReverseProxy -- SIEM : WAF Events
-IDS -- SIEM : Alerts
+' ============================================================
+' Verbindungen (physisch/logisch)
+' ============================================================
+
+' --- Internet ---
+Attacker --> Router_Internet : Angriff / Traffic aus Internet
+
+' --- Internet Routing ---
+Router_Internet --> Router_Edge
+Router_Edge <--> External_FW : Verbindung (172.168.3.0/30)
+
+' --- DMZ Routing ---
+External_FW --> DMZ_Switch : Verbindung (10.0.2.0/24)
+ReverseProxy --> DMZ_Switch : Access
+Webserver --> ReverseProxy
+Webserver --> Database : Read Only
+DMZ_Switch --> DMZ_IDS : Port Mirror
+
+' --- Interne Firewall ---
+Internal_FW --> DMZ_Switch : Direkter Link (10.0.2.254)
+Internal_FW --> External_FW : Direkter Link (192.168.20.0/24)
+
+' --- Internes Netz ---
+Internal_Client1 --> Internal_Switch
+Internal_Client2 --> Internal_Switch
+Internal_Switch --> Internal_FW : Default Gateway
+Internal_IDS --> Internal_Switch : Mirror Port
+
+' --- SIEM ---
+Internal_FW --> SIEM : Logs
+External_FW --> SIEM : Logs
+DMZ_IDS -- SIEM : Alerts
 Internal_IDS -- SIEM : Alerts
-EdgeGW -- SIEM : (optional) Logs
-' Entfernt: Verbindung zwischen SIEM und der Legende/Note (Legende ist jetzt unabhängig)
+ReverseProxy -- SIEM : WAF Events
+
+' ============================================================
+' Erläuternde Notizen
+' ============================================================
+
+note top of External_FW
+Internet ↔ DMZ erlaubt (80/443)
+Internet → Intern BLOCKIERT
+Internal ↔ Internet direkt über Internal_FW ↔ External_FW ↔ Edge ↔ Router-Internet
+Internal ↔ DMZ erlaubt
+DMZ ↔ Intern nur RELATED/ESTABLISHED
+end note
+
+note bottom of Internal_FW
+Routen:
+- 192.168.10.0/24 (intern)
+- 10.0.2.0/24 (DMZ)
+- Default via 192.168.20.2 (External FW)
+end note
+
 
 
 @enduml
