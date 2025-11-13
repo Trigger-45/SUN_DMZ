@@ -1,6 +1,6 @@
 @startuml
 ' ============================================================
-' PlantUML: Unternehmensnetzwerk – Komponenten einzeln dargestellt
+' PlantUML: Unternehmensnetzwerk – angepasst an containerlab Topo
 ' ============================================================
 
 skinparam componentStyle rectangle
@@ -10,103 +10,130 @@ skinparam rectangle {
   StereotypeFontColor #222222
 }
 
-actor "Internet Attacker" as Attacker
+actor "Internet Attacker\n(200.168.1.10)" as Attacker
 
 ' ===================== INTERNET-BEREICH =====================
-package "Internet Zone\n172.168.2.0/30" #FFF2F2 {
-  node Router_Internet as "Router-Internet\n172.168.2.1"
+package "Internet Zone\n200.168.1.0/24" #FFF2F2 {
+  node Router_Internet as "router-internet\n200.168.1.1\nlink to router-edge: 172.168.2.1/30"
 }
 
-package "Edge Zone\n172.168.3.0/30" #FFE9E9 {
-  node Router_Edge as "Router-Edge\n172.168.3.1"
+package "Edge Zone\n172.168.2.0/30 / 172.168.3.0/30" #FFE9E9 {
+  node Router_Edge as "router-edge\n172.168.2.2/30 (towards router-internet)\n172.168.3.1/30 (towards External_FW)"
 }
 
 ' ===================== EXTERNE FIREWALL =====================
-package "External Firewall\nEdge Firewall\n(iptables)\n172.168.3.2 / 10.0.2.1 / 192.168.20.2" #F4BFBF {
-  node External_FW as "External Firewall"
+package "External Firewall\n(iptables)\n172.168.3.2 / 192.168.20.2 / 10.0.2.2" #F4BFBF {
+  node External_FW as "External Firewall\neth2: 172.168.3.2/30\neth4: 192.168.20.2/24\neth1: 10.0.2.2/24"
 }
 
 ' ===================== DMZ =====================
 package "DMZ Zone\n10.0.2.0/24" #DFF2D8 {
-  node DMZ_Switch as "DMZ Switch\nManaged L3 Switch"
-  node ReverseProxy as "Reverse Proxy + WAF\n(NGINX + ModSecurity)" #FFF2B8
-  node Webserver as "Webserver\n(NGINX)" #E8F2F8
-  node Database as "Database\nMariaDB" #E8F2EA
-  node DMZ_IDS as "IDS (Suricata)\nMirror Port" #EFEFEF
+  node DMZ_Switch as "DMZ Switch\n(Managed L3 bridge)"
+  node ReverseProxy as "Proxy/WAF\n(Proxy_WAF / NGINX + ModSecurity)\nconnected: eth -> DMZ Switch" #FFF2B8
+  node Webserver as "Webserver\nnginx (Webserver)\n10.0.2.20 (example)" #E8F2F8
+  node Database as "Database\nPostgres / MariaDB\n10.0.2.10 (DB)" #E8F2EA
+  node DMZ_IDS as "IDS (Suricata)\nmirror port" #EFEFEF
 }
 
 ' ===================== INTERNE FIREWALL =====================
-package "Internal Firewall\n(iptables)\n192.168.10.1 / 10.0.2.254 / 192.168.20.1" #F4BFBF {
-  node Internal_FW as "Internal Firewall"
+package "Internal Firewall\n(iptables)\n192.168.10.1 / 10.0.2.1 / 192.168.20.1" #F4BFBF {
+  node Internal_FW as "Internal Firewall\neth1: 192.168.10.1/24 (internal)\neth2: 10.0.2.1/24 (DMZ)\neth3: 192.168.20.1/24 (to External_FW)"
 }
 
 ' ===================== INTERNES NETZ =====================
 package "Internal Zone\n192.168.10.0/24" #DCEBFF {
-  node Internal_Switch as "Internal Switch"
-  node Internal_Client1 as "Internal Client 1"
-  node Internal_Client2 as "Internal Client 2"
-  node Internal_IDS as "IDS (Suricata)\nMirror Port" #EFEFEF
+  node Internal_Switch as "Internal Switch\n(bridge)"
+  node Internal_Client1 as "Internal Client 1\n192.168.10.10/24"
+  node Internal_Client2 as "Internal Client 2\n192.168.10.11/24"
+  node Internal_IDS as "IDS (Suricata)\nmirror port" #EFEFEF
 }
 
 ' ===================== BACKEND / SIEM =====================
-package "Backend Zone\n10.0.5.0/24" #E9D6FF {
-  node SIEM as "SIEM / Logserver\n10.0.5.x"
+package "Backend Zone (SIEM)\n10.0.3.0/24" #E9D6FF {
+  node Filebeat as "Filebeat\ncollector"
+  node Elasticsearch as "Elasticsearch\n10.0.3.10"
+  node Kibana as "Kibana\n10.0.3.11"
+  node Admin_PC as "Admin_PC\n10.0.3.100"
 }
+
+' ===================== ROUTER/ATTACKER NODES (labels) =====================
+note right of Router_Internet
+eth1: 200.168.1.1/24 (towards Attacker)
+eth2: 172.168.2.1/30 (towards router-edge)
+end note
+
+note right of Router_Edge
+eth1: 172.168.2.2/30 (towards router-internet)
+eth2: 172.168.3.1/30 (towards External_FW)
+end note
 
 ' ============================================================
 ' Verbindungen (physisch/logisch)
 ' ============================================================
 
 ' --- Internet ---
-Attacker --> Router_Internet : Angriff / Traffic aus Internet
+Attacker --> Router_Internet : Angriff / Traffic aus Internet (200.168.1.0/24)
 
 ' --- Internet Routing ---
-Router_Internet --> Router_Edge
-Router_Edge <--> External_FW : Verbindung (172.168.3.0/30)
+Router_Internet --> Router_Edge : 172.168.2.1/30 <-> 172.168.2.2/30
+Router_Edge <--> External_FW : 172.168.3.1/30 <-> 172.168.3.2/30
 
 ' --- DMZ Routing ---
-External_FW --> DMZ_Switch : Verbindung (10.0.2.0/24)
-ReverseProxy --> DMZ_Switch : Access
-Webserver --> ReverseProxy
-Webserver --> Database : Read Only
-DMZ_Switch --> DMZ_IDS : Port Mirror
+External_FW --> DMZ_Switch : eth1 (10.0.2.2) → DMZ (10.0.2.0/24)
+ReverseProxy --> DMZ_Switch
+Webserver --> ReverseProxy : backend/proxy link
+Webserver --> Database : Read Only (app → DB 10.0.2.10)
+DMZ_Switch --> DMZ_IDS : Mirror / span port
 
 ' --- Interne Firewall ---
-Internal_FW --> DMZ_Switch : Direkter Link (10.0.2.254)
-Internal_FW --> External_FW : Direkter Link (192.168.20.0/24)
+Internal_FW --> DMZ_Switch : Internal FW has route to DMZ (10.0.2.1)
+Internal_FW --> External_FW : link via 192.168.20.1 <-> 192.168.20.2
 
 ' --- Internes Netz ---
 Internal_Client1 --> Internal_Switch
 Internal_Client2 --> Internal_Switch
-Internal_Switch --> Internal_FW : Default Gateway
+Internal_Switch --> Internal_FW
 Internal_IDS --> Internal_Switch : Mirror Port
 
-' --- SIEM ---
-Internal_FW --> SIEM : Logs
-External_FW --> SIEM : Logs
-DMZ_IDS -- SIEM : Alerts
-Internal_IDS -- SIEM : Alerts
-ReverseProxy -- SIEM : WAF Events
+' --- SIEM / Backend ---
+Internal_FW --> Filebeat : logs exported
+External_FW --> Filebeat : logs exported
+DMZ_IDS -- Filebeat : IDS alerts
+Internal_IDS -- Filebeat : IDS alerts
+ReverseProxy -- Filebeat : WAF events / logs
+Filebeat --> Elasticsearch : ship logs
+Elasticsearch --> Kibana
+Elasticsearch -- Admin_PC
+Kibana -- Admin_PC
 
 ' ============================================================
-' Erläuternde Notizen
+' Erläuternde Notizen / Regeln
 ' ============================================================
 
 note top of External_FW
-Internet ↔ DMZ erlaubt (80/443)
-Internet → Intern BLOCKIERT
-Internal ↔ Internet direkt über Internal_FW ↔ External_FW ↔ Edge ↔ Router-Internet
-Internal ↔ DMZ erlaubt
-DMZ ↔ Intern nur RELATED/ESTABLISHED
+External FW addresses:
+- DMZ: 10.0.2.2/24
+- Edge: 172.168.3.2/30
+- Link to Internal_FW: 192.168.20.2/24
+
+Wichtige Policies (aus Script übernommen):
+- Internet -> DMZ/Intern: NEW connections from Internet are DROPPED on External_FW.
+- DMZ -> Internal: only RELATED/ESTABLISHED allowed.
+- Internal -> DMZ: NEW allowed.
+- NAT (MASQUERADE) for outgoing traffic (10.0.2.0/24, 192.168.10.0/24) is performed on External_FW.
 end note
 
 note bottom of Internal_FW
-Routen:
-- 192.168.10.0/24 (intern)
-- 10.0.2.0/24 (DMZ)
-- Default via 192.168.20.2 (External FW)
+Internal FW addresses:
+- internal: 192.168.10.1/24
+- dmz: 10.0.2.1/24
+- link-to-external-fw: 192.168.20.1/24
+
+Routing & firewall summary:
+- Internal -> DMZ: NEW allowed
+- DMZ -> Internal: only RELATED/ESTABLISHED
+- Internal -> Internet: forwarded via External_FW (no NAT here)
 end note
 
-
-
 @enduml
+
