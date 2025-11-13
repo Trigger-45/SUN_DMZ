@@ -21,9 +21,9 @@ file_name="DMZ.yml"
 filebeat_config="filebeat.yml"
 Internal_Client1_ip="192.168.10.10/24"
 Internal_Client2_ip="192.168.10.11/24"
-Admin_PC_ip="192.168.100.10/24"
-Admin_FW_internal_ip="192.168.100.1/24"  # Admin-Firewall Interface zum Admin-PC
-Admin_FW_siem_ip="10.0.3.1/24"           # Admin-Firewall Interface zum SIEM
+Admin_PC_ip="10.0.3.100/24"
+#Admin_FW_internal_ip="192.168.100.1/24"  # Admin-Firewall Interface zum Admin-PC
+#Admin_FW_siem_ip="10.0.3.1/24"           # Admin-Firewall Interface zum SIEM
 SIEM_subnet="10.0.3.0/24"
 
 # =========================
@@ -87,15 +87,6 @@ topology:
       cap-add:
         - NET_ADMIN
     Internal_FW:
-      kind: linux
-      image: frrouting/frr:latest
-      type: host
-      group: firewall
-      cap-add:
-        - NET_ADMIN
-        - SYS_MODULE
-        - NET_RAW
-    SIEM_FW:
       kind: linux
       image: frrouting/frr:latest
       type: host
@@ -248,9 +239,8 @@ topology:
     - endpoints: ["filebeat:eth4", "Internal_FW:eth4"]
     - endpoints: ["filebeat:eth5", "External_FW:eth3"]
     - endpoints: ["filebeat:eth6", "Proxy_WAF:eth3"]
-    - endpoints: ["Admin_PC:eth1", "SIEM_FW:eth1"]
-    - endpoints: ["SIEM_FW:eth2", "elasticsearch:eth3"]
-    - endpoints: ["SIEM_FW:eth3", "kibana:eth2"]
+    - endpoints: ["Admin_PC:eth1", "elasticsearch:eth3"]
+    - endpoints: ["Admin_PC:eth2", "kibana:eth2"]
 EOF
 log_ok "Topology file '${file_name}' created successfully"
 
@@ -691,40 +681,12 @@ sudo docker exec -i clab-MaJuVi-Admin_PC sh <<EOF
 set -e
 apk add --no-cache curl >/dev/null 2>&1 || true
 ip addr add ${Admin_PC_ip} dev eth1 || true
+ip addr add 10.0.3.100/24 dev eth2 || true
 ip link set eth1 up
-ip route replace default via ${Admin_FW_internal_ip%/*} || true
+ip link set eth2 up
 EOF
 log_ok "Admin-PC configured"
 
-log_info "Configuring SIEM-Firewall"
-sudo docker exec -i clab-MaJuVi-SIEM_FW sh <<'EOF'
-set -e
-
-# Interfaces
-ip addr add 192.168.100.1/24 dev eth1  # Admin-PC
-ip addr add 10.0.3.1/24 dev eth2       # SIEM network
-ip link set eth1 up
-ip link set eth2 up
-
-# Enable forwarding
-echo 1 > /proc/sys/net/ipv4/ip_forward
-
-# Flush old rules
-iptables -F
-iptables -P FORWARD DROP
-
-# --- Allow ICMP (ping) both ways between Admin and SIEM networks ---
-iptables -A FORWARD -p icmp -s 192.168.100.0/24 -d 10.0.3.0/24 -j ACCEPT
-iptables -A FORWARD -p icmp -s 10.0.3.0/24 -d 192.168.100.0/24 -j ACCEPT
-
-# --- Allow Admin-PC → Elasticsearch/Kibana (TCP) ---
-iptables -A FORWARD -s 192.168.100.10 -d 10.0.3.10 -p tcp --dport 9200 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-iptables -A FORWARD -s 192.168.100.10 -d 10.0.3.11 -p tcp --dport 5601 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-
-# --- Allow return traffic ---
-iptables -A FORWARD -d 192.168.100.10 -s 10.0.3.0/24 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-EOF
-log_ok "SIEM-Firewall configured"
 
 
 # --- Configure Elasticsearch SIEM interface for Admin-Firewall ---
@@ -733,10 +695,8 @@ sudo docker exec -u 0 -i clab-MaJuVi-elasticsearch bash <<'EOF'
 set -e
 apt-get update -qq || true
 apt-get install -y iproute2 iputils-ping -qq || true
-apt-get install -y tcpdump || true
-ip addr add 10.0.3.10/24 dev eth2 || true
-ip link set eth2 up
-ip route replace default via 10.0.3.1 || true
+ip addr add 10.0.3.10/24 dev eth3 || true
+ip link set eth3 up
 EOF
 log_ok "Elasticsearch SIEM interface configured"
 
@@ -746,10 +706,8 @@ sudo docker exec -u 0 -i clab-MaJuVi-kibana bash <<'EOF'
 set -e
 apt-get update -qq || true
 apt-get install -y iproute2 iputils-ping -qq || true
-apt-get install -y tcpdump || true
 ip addr add 10.0.3.11/24 dev eth2 || true
 ip link set eth2 up
-ip route replace default via 10.0.3.1 || true
 EOF
 log_ok "Kibana SIEM interface configured"
 
