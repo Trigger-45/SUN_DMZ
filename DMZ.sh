@@ -103,6 +103,47 @@ log_info "Creating Webserver Flask app and Dockerfile..."
 
 mkdir -p ./webserver-details
 
+cat << 'EOF' > ./webserver-details/start.sh
+#!/bin/sh
+# Starte Flask App im Hintergrund
+python3 /app/app.py &
+
+# Starte Nginx im Vordergrund
+nginx -g "daemon off;"
+EOF
+
+cat << 'EOF' > ./webserver-details/nginx.conf
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    upstream flaskapp {
+        server 127.0.0.1:8080;  # Flask läuft lokal im Container auf 8080
+    }
+
+    server {
+        listen 80;
+
+        location / {
+            proxy_pass http://flaskapp;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+EOF
+
 cat << 'EOF' > ./webserver-details/app.py
 from flask import Flask, request, render_template_string, redirect, url_for, session
 import psycopg2
@@ -308,26 +349,30 @@ if __name__ == "__main__":
 EOF
 
 cat << 'EOF' > ./webserver-details/Dockerfile
-FROM python:3.11-alpine
+FROM owasp/modsecurity-crs:nginx-alpine
+
+USER root
 
 WORKDIR /app
 
-RUN apk add --no-cache gcc libc-dev libpq postgresql-dev \
-  && pip install --no-cache-dir flask psycopg2-binary \
-  && apk del gcc libc-dev postgresql-dev
+RUN apk add --no-cache python3 py3-flask py3-psycopg2 postgresql-dev libc-dev gcc
 
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY start.sh /app/start.sh
 COPY app.py /app/app.py
+
+RUN chmod +x /app/start.sh
 
 EXPOSE 8080
 
-CMD ["python", "app.py"]
+CMD ["/app/start.sh"]
 EOF
 
 log_ok "Webserver Flask app and Dockerfile created."
 
-log_info "Building webserver Docker image...(this may take a minute)"
-sudo docker build -t simple-login-webserver ./webserver-details
-log_ok "Webserver Docker image built."
+log_info "Building Webserver-waf-proxy Docker image...(this may take a minute)"
+sudo docker build -t webserver-waf-proxy ./webserver-details
+log_ok "Webserver-waf-proxy Docker image built."
 
 # =========================
 # Create topology file
@@ -391,7 +436,7 @@ topology:
         - NET_RAW
     Web_Proxy_WAF:
       kind: linux
-      image: owasp/modsecurity-crs:nginx-alpine
+      image: webserver-waf-proxy
       group: server
       ports:
         - "8181:8080"
@@ -796,7 +841,7 @@ sudo docker exec -i clab-MaJuVi-Database sh <<'EOF'
 set -e
 if command -v apt >/dev/null 2>&1; then
   apt update >/dev/null 2>&1 || true
-  apt install -y iproute2 iputils-ping >/dev/null 2>&1 || true
+  apt install -y iproute2 iputils-ping 
 elif command -v apk >/dev/null 2>&1; then
   apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
 fi
