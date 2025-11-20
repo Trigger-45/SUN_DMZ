@@ -418,7 +418,7 @@ topology:
         - NET_ADMIN
     Internal_FW:
       kind: linux
-      image: frrouting/frr:latest
+      image: ubuntu:latest
       type: host
       group: firewall
       cap-add:
