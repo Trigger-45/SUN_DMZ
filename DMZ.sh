@@ -375,6 +375,60 @@ sudo docker build -t webserver-waf-proxy ./webserver-details
 log_ok "Webserver-waf-proxy Docker image built."
 
 # =========================
+# Create Logstash Configuration
+# =========================
+log_info "Creating Logstash configuration..."
+
+# Create directory structure
+mkdir -p ./logstash/config
+mkdir -p ./logstash/pipeline
+sudo chmod -R 0777 ./logstash
+
+# Main Logstash configuration
+cat << 'EOF' > ./logstash/config/logstash.yml
+http.host: "0.0.0.0"
+path.config: /usr/share/logstash/pipeline/*.conf
+log.level: info
+EOF
+
+# Pipeline configuration
+cat << 'EOF' > ./logstash/pipeline/firewall.conf
+input {
+  beats {
+    port => 5044
+    host => "0.0.0.0"
+  }
+}
+
+filter {
+  if [log_type] == "firewall" {
+    grok {
+      match => { 
+        "message" => ".*\[%{DATA:prefix}\].*SRC=%{IP:src_ip} DST=%{IP:dst_ip}.*PROTO=%{WORD:protocol}.*SPT=%{INT:src_port}.*DPT=%{INT:dst_port}.*"
+      }
+    }
+    
+    mutate {
+      add_field => { "[@metadata][index]" => "firewall-%{firewall}-%{+YYYY.MM.dd}" }
+    }
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["http://10.0.3.26:9200"]
+    index => "%{[@metadata][index]}"
+  }
+  
+  stdout {
+    codec => rubydebug
+  }
+}
+EOF
+
+log_ok "Logstash configuration created."
+
+# =========================
 # Create topology file
 # (unchanged, benutze deine bestehende Topologie)
 # =========================
@@ -473,14 +527,25 @@ topology:
         - NET_ADMIN
         - NET_RAW
         - SYS_NICE
-    # --- Filebeat ---
-    filebeat:
+    SIEM_FW:
       kind: linux
-      image: docker.elastic.co/beats/filebeat:9.2.0
-      group: filebeat
+      image: ubuntu:latest
+      type: host
+      group: firewall
+      cap-add:
+        - NET_ADMIN
+        - SYS_MODULE
+        - NET_RAW
+    logstash:
+      kind: linux
+      image: docker.elastic.co/logstash/logstash:8.10.1
+      group: siem
       binds:
-        - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
-      cmd: filebeat -e -c /usr/share/filebeat/filebeat.yml
+        - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:rw
+        - ./logstash/pipeline:/usr/share/logstash/pipeline:rw
+      env:
+        XPACK_MONITORING_ENABLED: "false"
+        LS_JAVA_OPTS: "-Xmx512m -Xms512m"
       cap-add:
         - NET_ADMIN
     elasticsearch:
@@ -548,61 +613,26 @@ topology:
     - endpoints: ["Web_Proxy_WAF:eth1", "DMZ_Switch:eth3"]
     - endpoints: ["Database:eth1", "Web_Proxy_WAF:eth2"]
     - endpoints: ["IDS:eth1", "DMZ_Switch:eth4"]
-    - endpoints: ["IDS:eth2", "filebeat:eth1"]
-    - endpoints: ["filebeat:eth2", "elasticsearch:eth1"]
+    - endpoints: ["SIEM_FW:eth1", "Internal_FW:eth4"]
+    - endpoints: ["SIEM_FW:eth2", "External_FW:eth3"]
+    - endpoints: ["SIEM_FW:eth3", "logstash:eth1"]
+    - endpoints: ["logstash:eth2", "elasticsearch:eth1"]
     - endpoints: ["elasticsearch:eth2", "kibana:eth1"]
     - endpoints: ["Attacker:eth1", "router-internet:eth1"]
     - endpoints: ["router-internet:eth2", "router-edge:eth1"]
     - endpoints: ["router-edge:eth2", "External_FW:eth2"]
     - endpoints: ["IDS2:eth1", "Internal_Switch:eth4"]
-    - endpoints: ["IDS2:eth2", "filebeat:eth3"]
-    - endpoints: ["filebeat:eth4", "Internal_FW:eth4"]
-    - endpoints: ["filebeat:eth5", "External_FW:eth3"]
-    - endpoints: ["filebeat:eth6", "Web_Proxy_WAF:eth3"]
-    - endpoints: ["Admin_PC:eth1", "elasticsearch:eth3"]
-    - endpoints: ["Admin_PC:eth2", "kibana:eth2"]
+    - endpoints: ["SIEM_FW:eth4", "elasticsearch:eth3"]
+    - endpoints: ["SIEM_FW:eth5", "kibana:eth2"]
+    - endpoints: ["Admin_PC:eth1", "SIEM_FW:eth6"]
 EOF
 log_ok "Topology file '${file_name}' created successfully"
-
-# =========================
-# Filebeat configuration (aktualisiert: zwei inputs, eins für allgemeine logs, eins für firewall logs)
-# =========================
-log_info "Creating filebeat configuration..."
-cat << EOF > "$filebeat_config"
-filebeat.inputs:
-- type: filestream
-  id: "dummy-logs"
-  enabled: true
-  paths:
-    - /tmp/filebeat-simulated-logs/*.log
-  scan_frequency: 5s
-  harvester_limit: 0
-
-# Separates Input für Firewall-Logs mit einem zusätzlichen Feld
-- type: filestream
-  id: "firewall-logs"
-  enabled: true
-  paths:
-    - /tmp/filebeat-simulated-logs/fw_*.log
-  scan_frequency: 5s
-  harvester_limit: 0
-  fields:
-    log_type: firewall
-  fields_under_root: true
-
-output.elasticsearch:
-  hosts: ["http://elasticsearch:9200"]
-
-path.data: /tmp/filebeat-data
-EOF
-log_ok "Filebeat configuration '${filebeat_config}' created"
 
 # =========================
 # Prepare database directories
 # =========================
 mkdir -p ./dbdata
 sudo chmod 0777 ./dbdata
-
 
 # =========================
 # Deploy containerlab
@@ -621,18 +651,84 @@ until sudo docker exec clab-MaJuVi-elasticsearch curl -s http://localhost:9200/_
 done
 log_ok "Elasticsearch cluster reports green"
 
-# Remove possible Filebeat lockfile if container already exists
-if sudo docker ps -a --format '{{.Names}}' | grep -q 'clab-MaJuVi-filebeat'; then
-  log_info "Removing possible Filebeat lockfile inside container..."
-  sudo docker exec -it clab-MaJuVi-filebeat rm -f /usr/share/filebeat/data/filebeat.lock || true
-fi
 
-log_info "Restarting Filebeat to pick up new configuration..."
-# If container exists, restart it; otherwise containerlab will have created and launched it
-sudo docker restart clab-MaJuVi-filebeat || true
-# ensure filebeat runs with explicit command (relaunch if necessary)
-sudo docker exec -d clab-MaJuVi-filebeat sh -c 'filebeat -e -c /usr/share/filebeat/filebeat.yml' || true
-log_ok "Filebeat (re)started"
+
+# =========================
+# Configure Admin_FW (SIEM Gateway)
+# =========================
+log_info "Configuring SIEM_FW..."
+
+sudo docker exec -i clab-MaJuVi-SIEM_FW bash <<'EOF'
+set -e
+apt-get update -qq 2>&1 | tail -5
+apt-get install -y --no-install-recommends \
+    iptables \
+    iproute2 \
+    iputils-ping \
+    2>&1 | tail -10
+
+echo "Configuring SIEM_FW interfaces and routing..."
+
+# ===== KORRIGIERT: Separate Subnetze für jeden Link =====
+ip addr add 10.0.3.1/30 dev eth1 || true     # zu Internal_FW  (.1/30 = .0-.3)
+ip addr add 10.0.3.5/30 dev eth2 || true     # zu External_FW  (.5/30 = .4-.7)
+ip addr add 10.0.3.9/30 dev eth3 || true     # zu Logstash     (.9/30 = .8-.11)
+ip addr add 10.0.3.13/30 dev eth4 || true    # zu Elasticsearch (.13/30 = .12-.15)
+ip addr add 10.0.3.17/30 dev eth5 || true    # zu Kibana       (.17/30 = .16-.19)
+ip addr add 10.0.3.21/30 dev eth6 || true    # zu Admin_PC     (.21/30 = .20-.23)
+
+# Interfaces aktivieren
+ip link set eth1 up
+ip link set eth2 up
+ip link set eth3 up
+ip link set eth4 up
+ip link set eth5 up
+ip link set eth6 up
+
+# IP Forwarding aktivieren
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Disable ICMP redirects
+sysctl -w net.ipv4.conf.all.send_redirects=0 >/dev/null 2>&1
+sysctl -w net.ipv4.conf.default.send_redirects=0 >/dev/null 2>&1
+
+# Disable rp_filter
+sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1
+sysctl -w net.ipv4.conf.default.rp_filter=0 >/dev/null 2>&1
+
+# Flush all rules
+iptables -F
+iptables -t nat -F
+iptables -t mangle -F
+iptables -X 2>/dev/null || true
+
+# Set all policies to ACCEPT (SIEM gateway erlaubt alles)
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+
+echo "SIEM_FW configured successfully"
+EOF
+log_ok "SIEM_FW configured to ACCEPT ALL"
+
+# =========================
+# Configure Logstash
+# =========================
+log_info "Configuring Logstash"
+sudo docker exec -u 0 -i clab-MaJuVi-logstash bash <<'EOF'
+set -e
+apt-get update -qq && apt-get install -y iproute2 iputils-ping -qq
+# ===== KORRIGIERT: Passendes Subnetz =====
+ip addr add 10.0.3.10/30 dev eth1 || true    # zu SIEM_FW (.10 in .8-.11 subnet)
+ip addr add 10.0.3.25/30 dev eth2 || true    # zu Elasticsearch (.25 in .24-.27)
+ip link set eth1 up
+ip link set eth2 up
+
+# Default Gateway über SIEM_FW (KORRIGIERT!)
+ip route replace default via 10.0.3.9 dev eth1 || true
+EOF
+log_ok "Logstash configured"
+
 
 log_info "Configuring Internal Firewall with NFLOG (only working method)"
 sudo docker exec -i clab-MaJuVi-Internal_FW bash <<'EOF'
@@ -646,7 +742,7 @@ echo ""
 # ============================================
 # Install packages
 # ============================================
-echo "[1/6] Installing packages..."
+echo "[1/7] Installing packages..."
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update -qq 2>&1 | tail -5
@@ -657,16 +753,29 @@ apt-get install -y --no-install-recommends \
     net-tools \
     ulogd2 \
     ulogd2-json \
+    wget \
+    curl \
     bash \
     procps \
+    gnupg \
+    ca-certificates \
     2>&1 | tail -10
 
 echo "[OK] Packages installed"
 
+echo "[2/7] Installing Filebeat..."
+# Install Filebeat
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list
+apt-get update -qq
+apt-get install -y filebeat 2>&1 | tail -10
+
+
+
 # ============================================
 # Switch to iptables-legacy
 # ============================================
-echo "[2/6] Switching to iptables-legacy..."
+echo "[3/7] Switching to iptables-legacy..."
 update-alternatives --set iptables /usr/sbin/iptables-legacy 2>/dev/null || true
 update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy 2>/dev/null || true
 echo "[OK] Using: $(iptables --version)"
@@ -674,20 +783,22 @@ echo "[OK] Using: $(iptables --version)"
 # ============================================
 # Configure network interfaces
 # ============================================
-echo "[3/6] Configuring network interfaces..."
+echo "[4/7] Configuring network interfaces..."
 ip addr add 192.168.10.1/24 dev eth1 2>/dev/null || true   # Internal
 ip addr add 10.0.2.1/24 dev eth2 2>/dev/null || true       # DMZ
 ip addr add 192.168.20.1/24 dev eth3 2>/dev/null || true   # To External_FW
+ip addr add 10.0.3.2/30 dev eth4 || true     # zu SIEM_FW (.2 in .0-.3)
 ip link set eth1 up
 ip link set eth2 up
 ip link set eth3 up
+ip link set eth4 up
 echo 1 > /proc/sys/net/ipv4/ip_forward
 echo "[OK] Network configured"
 
 # ============================================
 # Configure ulogd2 for NFLOG
 # ============================================
-echo "[4/6] Configuring ulogd2..."
+echo "[5/7] Configuring ulogd2..."
 mkdir -p /var/log/firewall /var/log/ulogd /etc/ulogd
 
 cat > /etc/ulogd/ulogd.conf << 'ULOGD_CONFIG'
@@ -738,10 +849,35 @@ else
     exit 1
 fi
 
+# Configure Filebeat
+cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/firewall/firewall-events.log
+  fields:
+    firewall: internal
+    log_type: firewall
+  fields_under_root: true
+
+output.logstash:
+  hosts: ["10.0.3.10:5044"]
+
+path.data: /var/lib/filebeat
+logging.level: info
+FILEBEAT_CONFIG
+
+# Start Filebeat
+nohup filebeat -e -c /etc/filebeat/filebeat.yml > /var/log/filebeat.log 2>&1 &
+FILEBEAT_PID=$!
+sleep 2
+
+
 # ============================================
 # Configure iptables with NFLOG
 # ============================================
-echo "[5/6] Configuring iptables with NFLOG..."
+echo "[6/7] Configuring iptables with NFLOG..."
 
 # Flush existing rules
 iptables -F
@@ -811,13 +947,14 @@ iptables -A FORWARD -m limit --limit 5/min -j NFLOG \
 # ============================================
 ip route replace 172.168.2.0/30 via 192.168.20.2 dev eth3 2>/dev/null || true
 ip route replace 172.168.3.0/30 via 192.168.20.2 dev eth3 2>/dev/null || true
+ip route add 10.0.3.0/24 via 10.0.3.1 dev eth4 || true
 
 echo "[OK] iptables rules configured"
 
 # ============================================
 # Create helper scripts
 # ============================================
-echo "[6/6] Creating helper scripts..."
+echo "[7/7] Creating helper scripts..."
 
 cat > /usr/local/bin/fw-stats << 'STATS_SCRIPT'
 #!/bin/bash
@@ -975,7 +1112,7 @@ echo ""
 # ============================================
 # Install packages
 # ============================================
-echo "[1/6] Installing packages..."
+echo "[1/7] Installing packages..."
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update -qq 2>&1 | tail -5
@@ -986,16 +1123,28 @@ apt-get install -y --no-install-recommends \
     net-tools \
     ulogd2 \
     ulogd2-json \
+    wget \
+    curl \
     bash \
     procps \
+    gnupg \
+    ca-certificates \
     2>&1 | tail -10
 
 echo "[OK] Packages installed"
 
+
+echo "[2/7] Installing Filebeat..."
+# Install Filebeat
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list
+apt-get update -qq
+apt-get install -y filebeat 2>&1 | tail -10
+
 # ============================================
 # Switch to iptables-legacy
 # ============================================
-echo "[2/6] Switching to iptables-legacy..."
+echo "[3/7] Switching to iptables-legacy..."
 update-alternatives --set iptables /usr/sbin/iptables-legacy 2>/dev/null || true
 update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy 2>/dev/null || true
 echo "[OK] Using: $(iptables --version)"
@@ -1003,12 +1152,14 @@ echo "[OK] Using: $(iptables --version)"
 # ============================================
 # Configure network interfaces
 # ============================================
-echo "[3/6] Configuring network interfaces..."
+echo "[4/7] Configuring network interfaces..."
 ip addr add 10.0.2.2/24 dev eth1 2>/dev/null || true      # DMZ
 ip addr add 172.168.3.2/30 dev eth2 2>/dev/null || true   # Router Edge
 ip addr add 192.168.20.2/24 dev eth4 2>/dev/null || true  # Internal_FW link
+ip addr add 10.0.3.6/30 dev eth3 || true     # zu SIEM_FW (.6 in .4-.7)
 ip link set eth1 up
 ip link set eth2 up
+ip link set eth4 up
 ip link set eth4 up
 echo 1 > /proc/sys/net/ipv4/ip_forward
 echo "[OK] Network configured"
@@ -1016,7 +1167,7 @@ echo "[OK] Network configured"
 # ============================================
 # Configure ulogd2 for NFLOG
 # ============================================
-echo "[4/6] Configuring ulogd2..."
+echo "[5/7] Configuring ulogd2..."
 mkdir -p /var/log/firewall /var/log/ulogd /etc/ulogd
 
 cat > /etc/ulogd/ulogd.conf << 'ULOGD_CONFIG'
@@ -1067,10 +1218,34 @@ else
     exit 1
 fi
 
+# Configure Filebeat
+cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/firewall/firewall-events.log
+  fields:
+    firewall: external
+    log_type: firewall
+  fields_under_root: true
+
+output.logstash:
+  hosts: ["10.0.3.10:5044"]
+
+path.data: /var/lib/filebeat
+logging.level: info
+FILEBEAT_CONFIG
+
+# Start Filebeat
+nohup filebeat -e -c /etc/filebeat/filebeat.yml > /var/log/filebeat.log 2>&1 &
+FILEBEAT_PID=$!
+sleep 2
+
 # ============================================
 # Configure iptables with NFLOG
 # ============================================
-echo "[5/6] Configuring iptables with NFLOG..."
+echo "[6/7] Configuring iptables with NFLOG..."
 
 # Flush existing rules
 iptables -F
@@ -1155,11 +1330,12 @@ echo "[OK] iptables rules and NAT configured"
 # ============================================
 ip route replace 172.168.2.0/30 via 172.168.3.1 dev eth2 2>/dev/null || true
 ip route replace 192.168.10.0/24 via 192.168.20.1 dev eth4 2>/dev/null || true
+ip route add 10.0.3.0/24 via 10.0.3.5 dev eth3 || true
 
 # ============================================
 # Create helper scripts
 # ============================================
-echo "[6/6] Creating helper scripts..."
+echo "[7/7] Creating helper scripts..."
 
 cat > /usr/local/bin/fw-stats << 'STATS_SCRIPT'
 #!/bin/bash
@@ -1350,12 +1526,12 @@ ip link add name br0 type bridge 2>/dev/null || true
 ip link set eth1 master br0 2>/dev/null || true
 ip link set eth2 master br0 2>/dev/null || true
 ip link set eth3 master br0 2>/dev/null || true
-ip link set eth4 master br0 2>/dev/null || true
+#ip link set eth4 master br0 2>/dev/null || true
 ip link set br0 up
 ip link set eth1 up
 ip link set eth2 up
 ip link set eth3 up
-ip link set eth4 up
+#ip link set eth4 up
 EOF
 log_ok "DMZ Switch konfiguriert"
 
@@ -1494,39 +1670,65 @@ ip route replace 200.168.1.0/24 via 172.168.2.1
 EOF
 log_ok "router-edge configured"
 
-log_info "Configuring Admin-PC"
+# =========================
+# Configure Admin_PC
+# =========================
+log_info "Configuring Admin_PC"
 sudo docker exec -i clab-MaJuVi-Admin_PC sh <<EOF
 set -e
 apk add --no-cache curl >/dev/null 2>&1 || true
-ip addr add ${Admin_PC_ip} dev eth1 || true
-ip addr add 10.0.3.100/24 dev eth2 || true
+# ===== KORRIGIERT: Passendes Subnetz =====
+ip addr add 10.0.3.22/30 dev eth1 || true    # zu SIEM_FW (.22 in .20-.23)
+ip link set eth1 up
+
+# Default Gateway über SIEM_FW (KORRIGIERT!)
+ip route replace default via 10.0.3.21 || true
+EOF
+log_ok "Admin_PC configured"
+
+
+
+# =========================
+# Configure Elasticsearch
+# =========================
+# =========================
+# Configure Elasticsearch
+# =========================
+log_info "Configuring Elasticsearch"
+sudo docker exec -u 0 -i clab-MaJuVi-elasticsearch sh <<'EOF'
+set -e
+apt-get update -qq && apt-get install -y iproute2 iputils-ping -qq
+
+# Netzwerk konfigurieren
+ip addr add 10.0.3.26/30 dev eth1 || true
+ip addr add 10.0.3.29/30 dev eth2 || true
+ip addr add 10.0.3.14/30 dev eth3 || true
 ip link set eth1 up
 ip link set eth2 up
-EOF
-log_ok "Admin-PC configured"
-
-
-
-# --- Configure Elasticsearch SIEM interface for Admin-Firewall ---
-log_info "Configuring Elasticsearch SIEM interface for Admin-Firewall"
-sudo docker exec -u 0 -i clab-MaJuVi-elasticsearch bash <<'EOF'
-set -e
-apt-get update -qq >/dev/null 2>&1 || true
-apt-get install -y iproute2 iputils-ping -qq >/dev/null 2>&1 || true
-ip addr add 10.0.3.10/24 dev eth3 || true
 ip link set eth3 up
+ip route replace default via 10.0.3.13 dev eth3 || true
 EOF
-log_ok "Elasticsearch SIEM interface configured"
+log_ok "Elasticsearch configured"
 
-# --- Configure Kibana SIEM interface for Admin-Firewall ---
-log_info "Configuring Kibana SIEM interface for Admin-Firewall"
+# =========================
+# Configure Kibana
+# =========================
+log_info "Configuring Kibana"
 sudo docker exec -u 0 -i clab-MaJuVi-kibana bash <<'EOF'
 set -e
-apt-get update -qq >/dev/null 2>&1 || true
-apt-get install -y iproute2 iputils-ping -qq >/dev/null 2>&1 || true
-ip addr add 10.0.3.11/24 dev eth2 || true
+apt-get update -qq && apt-get install -y iproute2 iputils-ping -qq
+# ===== KORRIGIERT: Passendes Subnetz =====
+ip addr add 10.0.3.30/30 dev eth1 || true    # zu Elasticsearch (.30 in .28-.31)
+ip addr add 10.0.3.18/30 dev eth2 || true    # zu SIEM_FW (.18 in .16-.19)
+ip link set eth1 up
 ip link set eth2 up
+
+# Default Gateway über SIEM_FW (KORRIGIERT!)
+ip route replace default via 10.0.3.17 dev eth2 || true
+
+# Spezifische Route zu Elasticsearch über eth1 (KORRIGIERT!)
+ip route add 10.0.3.26/32 via 10.0.3.29 dev eth1 || true
 EOF
-log_ok "Kibana SIEM interface configured"
+log_ok "Kibana configured"
 
 log_ok "### Lab deployment and configuration completed"
