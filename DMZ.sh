@@ -474,6 +474,8 @@ output {
 EOF
 log_ok "Logstash configuration created."
 
+sudo chmod 777 ./logstash/config/logstash.yml
+
 echo ""
 log_ok "Creation of required Files completed."
 
