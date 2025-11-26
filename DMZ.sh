@@ -19,6 +19,7 @@ get_timestamp() {
 }
 
 # Advanced log functions
+# Advanced log functions
 log_section() { 
     echo ""
     echo -e "${BOLD}${CYAN}========================================${ENDCOLOR}"
@@ -99,6 +100,7 @@ mkdir -p ./webserver-details
 mkdir -p ./db-init
 
 # Create Database
+# Create Database
 log_step "1/3" "Creating Database initialization SQL..."
 
 
@@ -155,8 +157,10 @@ log_info "Creating start.sh script..."
 cat << 'EOF' > ./webserver-details/start.sh
 #!/bin/sh
 # Starting Flask App in the background
+# Starting Flask App in the background
 python3 /app/app.py &
 
+# Starting Nginx in the foreground
 # Starting Nginx in the foreground
 nginx -g "daemon off;"
 EOF
@@ -177,6 +181,7 @@ http {
     default_type  application/octet-stream;
 
     upstream flaskapp {
+        server 127.0.0.1:8080;  # Flask runs locally in the container on 8080
         server 127.0.0.1:8080;  # Flask runs locally in the container on 8080
     }
 
@@ -475,6 +480,9 @@ log_ok "Creation of required Files completed."
 # =========================
 # SECTION 3: Building Webserver Docker Image
 # =========================
+# =========================
+# SECTION 3: Building Webserver Docker Image
+# =========================
 log_subsection "SECTION 3: Building Webserver Docker Image"
 
 log_info "Building Webserver-waf-proxy Docker image...(this may take a minute)"
@@ -483,7 +491,11 @@ log_ok "Webserver-waf-proxy Docker image built."
 
 # =========================
 # SECTION 4: Deploy Containerlab Topology and Configure Nodes
+# SECTION 4: Deploy Containerlab Topology and Configure Nodes
 # =========================
+log_section "SECTION 4: Deploy Containerlab Topology and Configure Nodes"
+
+# Create topology file
 log_section "SECTION 4: Deploy Containerlab Topology and Configure Nodes"
 
 # Create topology file
@@ -697,6 +709,7 @@ log_ok "Containerlab topology deployed successfully"
 
 # =========================
 # SECTION 5: Wait for Elasticsearch to be ready
+# SECTION 5: Wait for Elasticsearch to be ready
 # =========================
 log_subsection "SECTION 5: Wait for Elasticsearch to be ready"
 log_info "Waiting for Elasticsearch to be ready (this may take a couple of minutes)..."
@@ -708,6 +721,9 @@ done
 echo ""
 log_ok "Elasticsearch cluster reports green"
 
+# =========================
+# SECTION 6: Configure Internal and External Firewall
+# =========================
 # =========================
 # SECTION 6: Configure Internal and External Firewall
 # =========================
@@ -761,6 +777,7 @@ echo "[4/7] Configuring network interfaces..."
 ip addr add 192.168.10.1/24 dev eth1 2>/dev/null || true   # Internal
 ip addr add 10.0.2.1/24 dev eth2 2>/dev/null || true       # DMZ
 ip addr add 192.168.20.1/24 dev eth3 2>/dev/null || true   # To External_FW
+ip addr add 10.0.3.2/30 dev eth4 || true                   # To SIEM_FW (.2 in .0-.3)
 ip addr add 10.0.3.2/30 dev eth4 || true                   # To SIEM_FW (.2 in .0-.3)
 ip link set eth1 up
 ip link set eth2 up
@@ -1105,6 +1122,7 @@ ip addr add 10.0.2.2/24 dev eth1 2>/dev/null || true      # DMZ
 ip addr add 172.168.3.2/30 dev eth2 2>/dev/null || true   # Router Edge
 ip addr add 192.168.20.2/24 dev eth4 2>/dev/null || true  # Internal_FW link
 ip addr add 10.0.3.6/30 dev eth3 || true                  # to SIEM_FW (.6 in .4-.7)
+ip addr add 10.0.3.6/30 dev eth3 || true                  # to SIEM_FW (.6 in .4-.7)
 ip link set eth1 up
 ip link set eth2 up
 ip link set eth4 up
@@ -1230,6 +1248,8 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
 # Port Forwarding for Webserver (Port 80)
 # Allow forwarded traffic to DMZ webserver
+# Port Forwarding for Webserver (Port 80)
+# Allow forwarded traffic to DMZ webserver
 iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
   --nflog-prefix "[EXT-FW-INET-TO-WEB-ALLOW] " \
   --nflog-group 0
@@ -1254,6 +1274,7 @@ iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW -m limit --limit 
 iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
 
 # Internet → DMZ (other ports are being blocked)
+# Internet → DMZ (other ports are being blocked)
 iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
   --nflog-prefix "[EXT-FW-INET-TO-DMZ-DROP] " \
   --nflog-group 0
@@ -1272,9 +1293,8 @@ iptables -A FORWARD -m limit --limit 5/min -j NFLOG \
 
 # NAT Configuration
 
-iptables -t nat -A PREROUTING -i eth2 -p icmp --icmp-type echo-request -j DNAT --to-destination 10.0.2.30
-
 # DNAT for incoming Web-Traffic (Port 80)
+# All requests on port 80 to eth2 (external interface) are forwarded to 10.0.2.30:80
 iptables -t nat -A PREROUTING -i eth2 -p tcp --dport 80 -j DNAT --to-destination 10.0.2.30:80
 
 # MASQUERADE traffic that leaves via eth2 (towards router-edge/internet)
@@ -1437,7 +1457,11 @@ log_ok "Configuration of Firewalls completed"
 
 # =========================
 # SECTION 7: Configuring Internal Hosts and Switches
+# SECTION 7: Configuring Internal Hosts and Switches
 # =========================
+log_section "SECTION 7: Configuring Internal Hosts and Switches..."
+
+# Internal Clients (IP + default route)
 log_section "SECTION 7: Configuring Internal Hosts and Switches..."
 
 # Internal Clients (IP + default route)
@@ -1463,6 +1487,7 @@ log_ok "Internal Clients configured"
 
 log_step "2/2" "Configuring Internal Switch..."
 
+
 # Internal Switch config
 log_info "Configurating Internal Switch"
 sudo docker exec -i clab-MaJuVi-Internal_Switch sh <<'EOF'
@@ -1485,7 +1510,11 @@ log_ok "Internal Hosts and Switches configured"
 
 # =========================
 # SECTION 8: Configuring DMZ
+# SECTION 8: Configuring DMZ
 # =========================
+log_section "SECTION 8: Configuring DMZ..."
+
+# DMZ Switch config
 log_section "SECTION 8: Configuring DMZ..."
 
 # DMZ Switch config
@@ -1538,8 +1567,10 @@ ip addr add 10.0.2.30/24 dev eth1 || true
 ip link set eth1 up
 
 # Route for internal network via Internal_FW
+# Route for internal network via Internal_FW
 ip route add 192.168.10.0/24 via 10.0.2.1 dev eth1 || true
 
+# Default Route (Internet) via External_FW
 # Default Route (Internet) via External_FW
 ip route replace default via 10.0.2.2 || true
 EOF
@@ -1549,6 +1580,9 @@ log_ok "Webserver configured"
 echo ""
 log_ok "DMZ configured"
 
+# =========================
+# SECTION 9: Configuring Router-edge
+# =========================
 # =========================
 # SECTION 9: Configuring Router-edge
 # =========================
@@ -1590,7 +1624,12 @@ log_ok "router-edge configured"
 
 # =========================
 # SECTION 10: Configuring Attacker and router-internet
+# SECTION 10: Configuring Attacker and router-internet
 # =========================
+log_section "SECTION 10: Configuring Attacker and router-internet..."
+log_step "1/2" "Configuring Attacker..."
+
+# Attacker host config
 log_section "SECTION 10: Configuring Attacker and router-internet..."
 log_step "1/2" "Configuring Attacker..."
 
@@ -1607,6 +1646,7 @@ EOF
 
 log_ok "Attacker configured"
 
+# Router-Internet configuration
 # Router-Internet configuration
 log_step "2/2" "Configuring router-internet..."
 log_info "Configuring router-internet"
@@ -1628,13 +1668,35 @@ ip link set eth1 up
 ip link set eth2 up
 
 # Activate forwarding
+# Activate forwarding
 echo 1 > /proc/sys/net/ipv4/ip_forward || true
 
+# Disable rp_filter
+sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1 || true
+sysctl -w net.ipv4.conf.default.rp_filter=0 >/dev/null 2>&1 || true
+sysctl -w net.ipv4.conf.eth1.rp_filter=0 >/dev/null 2>&1 || true
+sysctl -w net.ipv4.conf.eth2.rp_filter=0 >/dev/null 2>&1 || true
 
-iptables -P FORWARD ACCEPT
-iptables -P INPUT ACCEPT
-iptables -P OUTPUT ACCEPT
+# Base firewall: flush, default drop, allow established/related
+iptables -F
+iptables -P FORWARD DROP
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
+# Allow router-side initiated NEW connections to Attacker (eth2 -> eth1)
+iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
+
+# Explicitly drop any NEW from Attacker side (eth1) aimed at Internal (192.168.10.0/24)
+iptables -A FORWARD -i eth1 -o eth2 -d 192.168.10.0/24 -m conntrack --ctstate NEW -j DROP
+
+# Changed: Allow port 80 to External_FW IP (172.168.3.2)
+iptables -A FORWARD -i eth1 -o eth2 -d 172.168.3.2 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
+
+# Block all other NEW connections to the DMZ (except via the Firewall-IP)
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.0/24 -m conntrack --ctstate NEW -j DROP
+
+# Ensure routes for lab networks (so router-internet knows how to reach DMZ/Internal)
+# next-hop is router-edge (172.168.2.2)
+ip route replace 10.0.2.0/24 via 172.168.2.2 || true
 ip route replace 192.168.10.0/24 via 172.168.2.2 || true
 ip route replace 200.168.1.0/24 dev eth1 || true
 ip route replace 172.168.3.2 via 172.168.2.2 dev eth2
@@ -1646,6 +1708,9 @@ echo ""
 log_ok "Attacker and router-internet configured"
 
 
+# =========================
+# SECTION 11: Configuring SIEM components
+# =========================
 # =========================
 # SECTION 11: Configuring SIEM components
 # =========================
@@ -1674,6 +1739,7 @@ ip addr add 10.0.3.17/30 dev eth5 || true
 ip addr add 10.0.3.21/30 dev eth6 || true
 
 # Activate Interfaces
+# Activate Interfaces
 ip link set eth1 up
 ip link set eth2 up
 ip link set eth3 up
@@ -1682,12 +1748,14 @@ ip link set eth5 up
 ip link set eth6 up
 
 # Activate IP Forwarding
+# Activate IP Forwarding
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
 # Disable ICMP redirects
 sysctl -w net.ipv4.conf.all.send_redirects=0 >/dev/null 2>&1
 sysctl -w net.ipv4.conf.default.send_redirects=0 >/dev/null 2>&1
 
+# Disable rp_filter for flexible routing
 # Disable rp_filter for flexible routing
 sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1
 sysctl -w net.ipv4.conf.default.rp_filter=0 >/dev/null 2>&1
@@ -1807,6 +1875,9 @@ log_ok "Kibana configured"
 echo ""
 log_ok "SIEM components configured"
 
+# =========================
+# SECTION 12: Lab deployment and configuration completed
+# =========================
 # =========================
 # SECTION 12: Lab deployment and configuration completed
 # =========================
