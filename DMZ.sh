@@ -433,7 +433,6 @@ log_step "3/3" "Creating Logstash configuration..."
 # Main Logstash configuration
 log_info "Creating Logstash main configuration..."
 cat << 'EOF' > ./logstash/config/logstash.yml
-http.host: "0.0.0.0"
 path.config: /usr/share/logstash/pipeline/*.conf
 log.level: info
 EOF
@@ -473,8 +472,6 @@ output {
 }
 EOF
 log_ok "Logstash configuration created."
-
-sudo chmod 777 ./logstash/config/logstash.yml
 
 echo ""
 log_ok "Creation of required Files completed."
@@ -597,7 +594,7 @@ topology:
         - NET_RAW
     logstash:
       kind: linux
-      image: docker.elastic.co/logstash/logstash:8.10.1
+      image: elastic/logstash:9.1.7
       group: siem
       binds:
         - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:rw
@@ -609,7 +606,7 @@ topology:
         - NET_ADMIN
     elasticsearch:
       kind: linux
-      image: docker.elastic.co/elasticsearch/elasticsearch:8.10.1
+      image: elasticsearch:9.2.1
       group: siem
       env:
         discovery.type: single-node
@@ -621,10 +618,10 @@ topology:
         - NET_ADMIN
     kibana:
       kind: linux
-      image: docker.elastic.co/kibana/kibana:8.10.1
+      image: kibana:9.2.1
       group: siem
       env:
-        ELASTICSEARCH_HOSTS: "http://10.0.3.29:9200"
+        ELASTICSEARCH_HOSTS: "http://10.0.3.26:9200"
         SERVER_NAME: "kibana"
       ports:
         - "5601:5601"
@@ -1679,8 +1676,11 @@ log_ok "Attacker and router-internet configured"
 
 
 log_section "SECTION 11: Configuring SIEM components..."
+
+log_section "SECTION 11: Configuring SIEM components..."
+
 # =========================
-# Configure Admin_FW (SIEM Gateway)
+# Configure SIEM_FW
 # =========================
 log_step "1/5" "Configuring SIEM_FW..."
 log_info "Configuring SIEM_FW with restrictive firewall rules..."
@@ -1697,12 +1697,12 @@ apt-get install -y --no-install-recommends \
 echo "Configuring SIEM_FW interfaces and routing..."
 
 # Separate /30 Subnetze für jeden Link
-ip addr add 10.0.3.1/30 dev eth1 || true     # zu Internal_FW  (.1/30 = .0-.3)
-ip addr add 10.0.3.5/30 dev eth2 || true     # zu External_FW  (.5/30 = .4-.7)
-ip addr add 10.0.3.9/30 dev eth3 || true     # zu Logstash     (.9/30 = .8-.11)
-ip addr add 10.0.3.13/30 dev eth4 || true    # zu Elasticsearch (.13/30 = .12-.15)
-ip addr add 10.0.3.17/30 dev eth5 || true    # zu Kibana       (.17/30 = .16-.19)
-ip addr add 10.0.3.21/30 dev eth6 || true    # zu Admin_PC     (.21/30 = .20-.23)
+ip addr add 10.0.3.1/30 dev eth1 || true
+ip addr add 10.0.3.5/30 dev eth2 || true
+ip addr add 10.0.3.9/30 dev eth3 || true
+ip addr add 10.0.3.13/30 dev eth4 || true
+ip addr add 10.0.3.17/30 dev eth5 || true
+ip addr add 10.0.3.21/30 dev eth6 || true
 
 # Interfaces aktivieren
 ip link set eth1 up
@@ -1729,10 +1729,6 @@ iptables -t nat -F
 iptables -t mangle -F
 iptables -X 2>/dev/null || true
 
-# ==============================================
-# RESTRICTIVE FIREWALL POLICY (Zero-Trust SIEM)
-# ==============================================
-
 # Default DROP policies
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
@@ -1748,88 +1744,82 @@ iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/sec -j ACC
 # 1. Admin_PC → Kibana (Port 5601)
 iptables -A FORWARD -s 10.0.3.22 -d 10.0.3.18 -p tcp --dport 5601 -m conntrack --ctstate NEW -j ACCEPT
 
-# 2. Admin_PC → Elasticsearch (Port 9200) - direkte API-Abfragen
+# 2.  Admin_PC → Elasticsearch (Port 9200)
 iptables -A FORWARD -s 10.0.3.22 -d 10.0.3.14 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
 iptables -A FORWARD -s 10.0.3.22 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
+# 3.  Firewall-Filebeats → Logstash (Port 5044)
+iptables -A FORWARD -s 10.0.3.2 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s 10.0.3.6 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
 
-# 3. Firewall-Filebeats → Logstash (Port 5044)
-iptables -A FORWARD -s 10.0.3.2 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT  # Internal_FW
-iptables -A FORWARD -s 10.0.3.6 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT  # External_FW
-
-# 4. Logstash → Elasticsearch (Port 9200)
+# 4.  Logstash → Elasticsearch (Port 9200)
 iptables -A FORWARD -s 10.0.3.10 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
 
 # 5. Kibana → Elasticsearch (Port 9200)
-iptables -A FORWARD -s 10.0.3.30 -d 10.0.3.29 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
-
-# 6. Established/Related connections (return traffic)
+iptables -A FORWARD -s 10.0.3.30 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s 10.0.3.18 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
+# 6.  Established/Related connections
 iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
-# 7. Log dropped packets (optional, für Debugging)
+# 7. Log dropped packets
 iptables -A FORWARD -m limit --limit 5/min -j LOG --log-prefix "[SIEM_FW-DROP] " --log-level 7
 
 echo "SIEM_FW configured with restrictive micro-segmentation rules"
 EOF
 
-log_ok "SIEM_FW configured with Zero-Trust policy"
+log_ok "SIEM_FW configured"
 
-log_step "2/5" "Configuring Logstash..."
 # =========================
 # Configure Logstash
 # =========================
-log_info "Configuring Logstash"
-sudo docker exec -u 0 -i clab-MaJuVi-logstash bash <<'EOF'
-set -e
-apt-get update -qq && apt-get install -y iproute2 iputils-ping -qq
-# ===== KORRIGIERT: Passendes Subnetz =====
-ip addr add 10.0.3.10/30 dev eth1 || true    # zu SIEM_FW (.10 in .8-.11 subnet)
-ip addr add 10.0.3.25/30 dev eth2 || true    # zu Elasticsearch (.25 in .24-.27)
-ip link set eth1 up
-ip link set eth2 up
+log_step "2/5" "Configuring Logstash..."
+log_info "Configuring Logstash network via nsenter..."
 
-# Default Gateway über SIEM_FW (KORRIGIERT!)
-ip route replace default via 10.0.3.9 dev eth1 || true
-EOF
+LOGSTASH_PID=$(sudo docker inspect -f '{{.State.Pid}}' clab-MaJuVi-logstash)
+sudo nsenter -t $LOGSTASH_PID -n ip addr add 10.0.3.10/30 dev eth1 || true
+sudo nsenter -t $LOGSTASH_PID -n ip addr add 10.0.3.25/30 dev eth2 || true
+sudo nsenter -t $LOGSTASH_PID -n ip link set eth1 up
+sudo nsenter -t $LOGSTASH_PID -n ip link set eth2 up
+sudo nsenter -t $LOGSTASH_PID -n ip route replace default via 10.0.3.9 dev eth1 || true
+
+echo "=== Logstash Network Configuration ==="
+sudo nsenter -t $LOGSTASH_PID -n ip addr show | grep "inet " || true
+sudo nsenter -t $LOGSTASH_PID -n ip route show || true
 
 log_ok "Logstash configured"
 
-log_step "3/5" "Configuring Internal_FW..."
 # =========================
 # Configure Admin_PC
 # =========================
+log_step "3/5" "Configuring Admin_PC..."
 log_info "Configuring Admin_PC"
 sudo docker exec -i clab-MaJuVi-Admin_PC sh <<EOF
 set -e
 apk add --no-cache curl >/dev/null 2>&1 || true
-# ===== KORRIGIERT: Passendes Subnetz =====
-ip addr add 10.0.3.22/30 dev eth1 || true    # zu SIEM_FW (.22 in .20-.23)
+ip addr add 10.0.3.22/30 dev eth1 || true
 ip link set eth1 up
-
-# Default Gateway über SIEM_FW (KORRIGIERT!)
 ip route replace default via 10.0.3.21 || true
 EOF
 
 log_ok "Admin_PC configured"
 
-
 # =========================
 # Configure Elasticsearch
 # =========================
 log_step "4/5" "Configuring Elasticsearch..."
-log_info "Configuring Elasticsearch"
-sudo docker exec -u 0 -i clab-MaJuVi-elasticsearch sh <<'EOF'
-set -e
-apt-get update -qq && apt-get install -y iproute2 iputils-ping -qq
+log_info "Configuring Elasticsearch network via nsenter..."
 
-# Netzwerk konfigurieren
-ip addr add 10.0.3.26/30 dev eth1 || true
-ip addr add 10.0.3.29/30 dev eth2 || true
-ip addr add 10.0.3.14/30 dev eth3 || true
-ip link set eth1 up
-ip link set eth2 up
-ip link set eth3 up
-ip route replace default via 10.0.3.13 dev eth3 || true
-EOF
+ELASTICSEARCH_PID=$(sudo docker inspect -f '{{.State.Pid}}' clab-MaJuVi-elasticsearch)
+sudo nsenter -t $ELASTICSEARCH_PID -n ip addr add 10.0.3.26/30 dev eth1 || true
+sudo nsenter -t $ELASTICSEARCH_PID -n ip addr add 10.0.3.29/30 dev eth2 || true
+sudo nsenter -t $ELASTICSEARCH_PID -n ip addr add 10.0.3.14/30 dev eth3 || true
+sudo nsenter -t $ELASTICSEARCH_PID -n ip link set eth1 up
+sudo nsenter -t $ELASTICSEARCH_PID -n ip link set eth2 up
+sudo nsenter -t $ELASTICSEARCH_PID -n ip link set eth3 up
+sudo nsenter -t $ELASTICSEARCH_PID -n ip route replace default via 10.0.3.13 dev eth3 || true
+
+echo "=== Elasticsearch Network Configuration ==="
+sudo nsenter -t $ELASTICSEARCH_PID -n ip addr show | grep "inet " || true
+sudo nsenter -t $ELASTICSEARCH_PID -n ip route show || true
 
 log_ok "Elasticsearch configured"
 
@@ -1837,22 +1827,19 @@ log_ok "Elasticsearch configured"
 # Configure Kibana
 # =========================
 log_step "5/5" "Configuring Kibana..."
-log_info "Configuring Kibana"
-sudo docker exec -u 0 -i clab-MaJuVi-kibana bash <<'EOF'
-set -e
-apt-get update -qq && apt-get install -y iproute2 iputils-ping -qq
-# ===== KORRIGIERT: Passendes Subnetz =====
-ip addr add 10.0.3.30/30 dev eth1 || true    # zu Elasticsearch (.30 in .28-.31)
-ip addr add 10.0.3.18/30 dev eth2 || true    # zu SIEM_FW (.18 in .16-.19)
-ip link set eth1 up
-ip link set eth2 up
+log_info "Configuring Kibana network via nsenter..."
 
-# Default Gateway über SIEM_FW (KORRIGIERT!)
-ip route replace default via 10.0.3.17 dev eth2 || true
+KIBANA_PID=$(sudo docker inspect -f '{{.State.Pid}}' clab-MaJuVi-kibana)
+sudo nsenter -t $KIBANA_PID -n ip addr add 10.0.3.30/30 dev eth1 || true
+sudo nsenter -t $KIBANA_PID -n ip addr add 10.0.3.18/30 dev eth2 || true
+sudo nsenter -t $KIBANA_PID -n ip link set eth1 up
+sudo nsenter -t $KIBANA_PID -n ip link set eth2 up
+sudo nsenter -t $KIBANA_PID -n ip route replace default via 10.0.3.17 dev eth2 || true
+sudo nsenter -t $KIBANA_PID -n ip route add 10.0.3.26/32 via 10.0.3.29 dev eth1 || true
 
-# Spezifische Route zu Elasticsearch über eth1 (KORRIGIERT!)
-ip route add 10.0.3.26/32 via 10.0.3.29 dev eth1 || true
-EOF
+echo "=== Kibana Network Configuration ==="
+sudo nsenter -t $KIBANA_PID -n ip addr show | grep "inet " || true
+sudo nsenter -t $KIBANA_PID -n ip route show || true
 
 log_ok "Kibana configured"
 
