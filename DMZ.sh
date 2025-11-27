@@ -883,11 +883,16 @@ iptables -A FORWARD -m conntrack --ctstate INVALID -j LOG_INVALID
 # Established/Related
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# Internal → DMZ
-iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[INT-FW-INTERN-TO-DMZ] " \
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
+  --nflog-prefix "[INT-FW-INTERN-TO-WEB-80] " \
   --nflog-group 0
-iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
+
+# Internal → DMZ: Block all other traffic to Webserver
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
+  --nflog-prefix "[INT-FW-WEB-OTHER-DROP] " \
+  --nflog-group 0
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -m conntrack --ctstate NEW -j DROP
 
 # DMZ → Internal (blocked)
 iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
