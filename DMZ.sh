@@ -1582,7 +1582,6 @@ iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
 iptables -I FORWARD 1 -s 192.168.10.0/24 -d 200.168.1.0/24 -m conntrack --ctstate NEW -j DROP
 
 # Routing
-ip route replace 10.0.2.0/24 via 172.168.3.2
 ip route replace 192.168.10.0/24 via 172.168.3.2
 ip route replace 200.168.1.0/24 via 172.168.2.1
 EOF
@@ -1636,8 +1635,6 @@ iptables -P FORWARD ACCEPT
 iptables -P INPUT ACCEPT
 iptables -P OUTPUT ACCEPT
 
-
-ip route replace 10.0.2.0/24 via 172.168.2.2 || true
 ip route replace 192.168.10.0/24 via 172.168.2.2 || true
 ip route replace 200.168.1.0/24 dev eth1 || true
 ip route replace 172.168.3.2 via 172.168.2.2 dev eth2
