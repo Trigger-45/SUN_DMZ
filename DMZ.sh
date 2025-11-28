@@ -1339,18 +1339,22 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
 # Port Forwarding for Webserver (Port 80)
 # Allow forwarded traffic to DMZ webserver
-# Port Forwarding for Webserver (Port 80)
-# Allow forwarded traffic to DMZ webserver
 iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
   --nflog-prefix "[EXT-FW-INET-TO-WEB-ALLOW] " \
   --nflog-group 0
 iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
 
-# Allow ICMP (ping) to Webserver**
+# Allow ICMP (ping) to Webserver - NUR zum Webserver selbst, nicht weitergeleitet
 iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
   --nflog-prefix "[EXT-FW-INET-TO-WEB-ICMP] " \
   --nflog-group 0
 iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request -m conntrack --ctstate NEW -j ACCEPT
+
+# **NEU: Block ICMP to internal network (verhindert Ping-Weiterleitung)**
+iptables -A FORWARD -i eth2 -o eth1 -d 192.168.10.0/24 -p icmp -m limit --limit 5/min -j NFLOG \
+  --nflog-prefix "[EXT-FW-INET-TO-INTERN-ICMP-DROP] " \
+  --nflog-group 0
+iptables -A FORWARD -i eth2 -o eth1 -d 192.168.10.0/24 -p icmp -j DROP
 
 # DMZ → Internet (NEW)
 iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
@@ -1364,7 +1368,6 @@ iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW -m limit --limit 
   --nflog-group 0
 iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
 
-# Internet → DMZ (other ports are being blocked)
 # Internet → DMZ (other ports are being blocked)
 iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
   --nflog-prefix "[EXT-FW-INET-TO-DMZ-DROP] " \
@@ -1384,11 +1387,17 @@ iptables -A FORWARD -m limit --limit 5/min -j NFLOG \
 
 # NAT Configuration
 
-# DNAT for incoming Web-Traffic (Port 80)
-# All requests on port 80 to eth2 (external interface) are forwarded to 10.0.2.30:80
-iptables -t nat -A PREROUTING -i eth2 -p tcp --dport 80 -j DNAT --to-destination 10.0.2.30:80
+# DNAT: Virtuelle öffentliche IP 172.168.3.5 → Webserver 10.0.2.30
+# Für ICMP (Ping)
+iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p icmp --icmp-type echo-request -j DNAT --to-destination 10.0.2.30
 
-# MASQUERADE traffic that leaves via eth2 (towards router-edge/internet)
+# Für HTTP (Port 80)
+iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p tcp --dport 80 -j DNAT --to-destination 10.0.2.30:80
+
+# SNAT: Antworten vom Webserver erscheinen als 172.168.3.5
+iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.30 -j SNAT --to-source 172.168.3.5
+
+# MASQUERADE für ausgehenden Traffic (Internal/DMZ → Internet)
 iptables -t nat -A POSTROUTING -o eth2 -s 192.168.10.0/24 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.0/24 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o eth2 -s 192.168.20.0/24 -j MASQUERADE
@@ -1704,6 +1713,7 @@ iptables -I FORWARD 1 -s 192.168.10.0/24 -d 200.168.1.0/24 -m conntrack --ctstat
 # Routing
 ip route replace 192.168.10.0/24 via 172.168.3.2
 ip route replace 200.168.1.0/24 via 172.168.2.1
+ip route add 172.168.3.5 via 172.168.3.2 dev eth2 || true
 EOF
 
 log_ok "router-edge configured"
@@ -1753,38 +1763,17 @@ ip link set eth1 up
 ip link set eth2 up
 
 # Activate forwarding
-# Activate forwarding
 echo 1 > /proc/sys/net/ipv4/ip_forward || true
 
-# Disable rp_filter
-sysctl -w net.ipv4.conf.all.rp_filter=0 >/dev/null 2>&1 || true
-sysctl -w net.ipv4.conf.default.rp_filter=0 >/dev/null 2>&1 || true
-sysctl -w net.ipv4.conf.eth1.rp_filter=0 >/dev/null 2>&1 || true
-sysctl -w net.ipv4.conf.eth2.rp_filter=0 >/dev/null 2>&1 || true
 
-# Base firewall: flush, default drop, allow established/related
-iptables -F
-iptables -P FORWARD DROP
-iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P INPUT ACCEPT
+iptables -P OUTPUT ACCEPT
 
-# Allow router-side initiated NEW connections to Attacker (eth2 -> eth1)
-iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
 
-# Explicitly drop any NEW from Attacker side (eth1) aimed at Internal (192.168.10.0/24)
-iptables -A FORWARD -i eth1 -o eth2 -d 192.168.10.0/24 -m conntrack --ctstate NEW -j DROP
-
-# Changed: Allow port 80 to External_FW IP (172.168.3.2)
-iptables -A FORWARD -i eth1 -o eth2 -d 172.168.3.2 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
-
-# Block all other NEW connections to the DMZ (except via the Firewall-IP)
-iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.0/24 -m conntrack --ctstate NEW -j DROP
-
-# Ensure routes for lab networks (so router-internet knows how to reach DMZ/Internal)
-# next-hop is router-edge (172.168.2.2)
-ip route replace 10.0.2.0/24 via 172.168.2.2 || true
-ip route replace 192.168.10.0/24 via 172.168.2.2 || true
-ip route replace 200.168.1.0/24 dev eth1 || true
-ip route replace 172.168.3.2 via 172.168.2.2 dev eth2
+ip route add 192.168.10.0/24 via 172.168.2.2 || true
+ip route add 200.168.1.0/24 dev eth1 || true
+ip route add 172.168.3.0/24 via 172.168.2.2 dev eth2 || true
 EOF
 
 log_ok "router-internet configured"
