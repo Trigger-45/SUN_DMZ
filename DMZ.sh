@@ -100,8 +100,7 @@ mkdir -p ./webserver-details
 mkdir -p ./db-init
 
 # Create Database
-# Create Database
-log_step "1/3" "Creating Database initialization SQL..."
+log_step "1/4" "Creating Database initialization SQL..."
 
 
 log_info "Creating init-users.sql for PostgreSQL..."
@@ -572,9 +571,6 @@ log_ok "Creation of required Files completed."
 # =========================
 # SECTION 3: Building Webserver Docker Image
 # =========================
-# =========================
-# SECTION 3: Building Webserver Docker Image
-# =========================
 log_subsection "SECTION 3: Building Webserver Docker Image"
 
 log_info "Building Webserver-waf-proxy Docker image...(this may take a minute)"
@@ -582,7 +578,6 @@ sudo docker build -t webserver-waf-proxy ./webserver-details
 log_ok "Webserver-waf-proxy Docker image built."
 
 # =========================
-# SECTION 4: Deploy Containerlab Topology and Configure Nodes
 # SECTION 4: Deploy Containerlab Topology and Configure Nodes
 # =========================
 log_section "SECTION 4: Deploy Containerlab Topology and Configure Nodes"
@@ -809,7 +804,6 @@ log_ok "Containerlab topology deployed successfully"
 
 # =========================
 # SECTION 5: Wait for Elasticsearch to be ready
-# SECTION 5: Wait for Elasticsearch to be ready
 # =========================
 log_subsection "SECTION 5: Wait for Elasticsearch to be ready"
 log_info "Waiting for Elasticsearch to be ready (this may take a couple of minutes)..."
@@ -821,9 +815,6 @@ done
 echo ""
 log_ok "Elasticsearch cluster reports green"
 
-# =========================
-# SECTION 6: Configure Internal and External Firewall
-# =========================
 # =========================
 # SECTION 6: Configure Internal and External Firewall
 # =========================
@@ -1557,7 +1548,6 @@ log_ok "Configuration of Firewalls completed"
 
 # =========================
 # SECTION 7: Configuring Internal Hosts and Switches
-# SECTION 7: Configuring Internal Hosts and Switches
 # =========================
 log_section "SECTION 7: Configuring Internal Hosts and Switches..."
 
@@ -1609,7 +1599,6 @@ echo ""
 log_ok "Internal Hosts and Switches configured"
 
 # =========================
-# SECTION 8: Configuring DMZ
 # SECTION 8: Configuring DMZ
 # =========================
 log_section "SECTION 8: Configuring DMZ..."
@@ -1683,9 +1672,6 @@ log_ok "DMZ configured"
 # =========================
 # SECTION 9: Configuring Router-edge
 # =========================
-# =========================
-# SECTION 9: Configuring Router-edge
-# =========================
 log_section "SECTION 9: Configuring Router-edge..."
 # router-edge configuration
 log_info "Configuring router-edge"
@@ -1723,7 +1709,6 @@ EOF
 log_ok "router-edge configured"
 
 # =========================
-# SECTION 10: Configuring Attacker and router-internet
 # SECTION 10: Configuring Attacker and router-internet
 # =========================
 log_section "SECTION 10: Configuring Attacker and router-internet..."
@@ -1808,9 +1793,6 @@ echo ""
 log_ok "Attacker and router-internet configured"
 
 
-# =========================
-# SECTION 11: Configuring SIEM components
-# =========================
 # =========================
 # SECTION 11: Configuring SIEM components
 # =========================
@@ -1975,9 +1957,6 @@ log_ok "Kibana configured"
 echo ""
 log_ok "SIEM components configured"
 
-# =========================
-# SECTION 12: Lab deployment and configuration completed
-# =========================
 # =========================
 # SECTION 12: Lab deployment and configuration completed
 # =========================
