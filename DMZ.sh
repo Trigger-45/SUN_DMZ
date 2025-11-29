@@ -563,6 +563,62 @@ output {
   }
 }
 EOF
+
+log_info "Creating Logstash pipeline for IDS logs..."
+cat << 'EOF' > ./logstash/pipeline/ids.conf
+input {
+  beats {
+    port => 5044
+    host => "0.0.0.0"
+  }
+}
+
+filter {
+  if [log_type] == "ids" {
+    json {
+      source => "message"
+      target => "suricata"
+    }
+    
+    if [suricata][event_type] == "alert" {
+      mutate {
+        add_field => { 
+          "alert_signature" => "%{[suricata][alert][signature]}"
+          "alert_category" => "%{[suricata][alert][category]}"
+          "alert_severity" => "%{[suricata][alert][severity]}"
+          "src_ip" => "%{[suricata][src_ip]}"
+          "dest_ip" => "%{[suricata][dest_ip]}"
+          "src_port" => "%{[suricata][src_port]}"
+          "dest_port" => "%{[suricata][dest_port]}"
+          "protocol" => "%{[suricata][proto]}"
+        }
+      }
+    }
+    
+    date {
+      match => [ "[suricata][timestamp]", "ISO8601" ]
+      target => "@timestamp"
+    }
+    
+    mutate {
+      add_field => { "[@metadata][index]" => "suricata-%{ids}-%{+YYYY.MM.dd}" }
+    }
+  }
+}
+
+output {
+  if [log_type] == "ids" {
+    elasticsearch {
+      hosts => ["http://10.0.3.26:9200"]
+      index => "%{[@metadata][index]}"
+    }
+    
+    stdout {
+      codec => rubydebug
+    }
+  }
+}
+EOF
 log_ok "Logstash configuration created."
 
 echo ""
@@ -1575,10 +1631,12 @@ echo "[2/3] configure Filebeat..."
 cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
 filebeat modules enable suricata
 filebeat.inputs:
-- type: logoD IDS...
+- type: log
   enabled: true
   paths:
     - /var/log/suricata/eve.json
+  json.keys_under_root: true
+  json.add_error_key: true
   fields:
     ids: internal
     log_type: ids
@@ -1586,9 +1644,21 @@ filebeat.inputs:
 
 output.logstash:
   hosts: ["10.0.3.10:5044"]
+  loadbalance: true
+  bulk_max_size: 2048
+
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 1s
 
 path.data: /var/lib/filebeat
-logging.level: info
+logging.level: warning
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 3
 FILEBEAT_CONFIG
 
 # Start Filebeat
@@ -1627,10 +1697,12 @@ echo "[2/3] configure Filebeat..."
 cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
 filebeat modules enable suricata
 filebeat.inputs:
-- type: logo
+- type: log
   enabled: true
   paths:
     - /var/log/suricata/eve.json
+  json.keys_under_root: true
+  json.add_error_key: true
   fields:
     ids: internal
     log_type: ids
@@ -1638,9 +1710,21 @@ filebeat.inputs:
 
 output.logstash:
   hosts: ["10.0.3.10:5044"]
+  loadbalance: true
+  bulk_max_size: 2048
+
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 1s
 
 path.data: /var/lib/filebeat
-logging.level: info
+logging.level: warning
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 3
 FILEBEAT_CONFIG
 
 # Start Filebeat
