@@ -1670,6 +1670,7 @@ echo "[3/3] setting ip"
 ip addr add 10.0.2.10/24 dev eth1 || true
 ip link set eth1 up
 ip route replace default via 192.168.10.42 || true
+ip route add 10.0.3.0/24 via 10.0.3.5 dev eth3 || true
 
 echo ""
 echo "=========================================="
@@ -1704,7 +1705,7 @@ filebeat.inputs:
   json.keys_under_root: true
   json.add_error_key: true
   fields:
-    ids: internal
+    ids: dmz
     log_type: ids
   fields_under_root: true
 
@@ -1736,6 +1737,7 @@ echo "[3/3] setting ip"
 ip addr add 10.0.2.20/24 dev eth1 || true
 ip link set eth1 up
 ip route replace default via 10.0.2.42 || true
+ip route add 10.0.3.0/24 via 10.0.3.5 dev eth3 || true
 
 echo ""
 echo "=========================================="
@@ -2007,6 +2009,8 @@ ip addr add 10.0.3.9/30 dev eth3 || true
 ip addr add 10.0.3.13/30 dev eth4 || true
 ip addr add 10.0.3.17/30 dev eth5 || true
 ip addr add 10.0.3.21/30 dev eth6 || true
+ip addr add 10.0.3.25/30 dev eth7 || true
+ip addr add 10.0.3.29/30 dev eth8 || true
 
 # Activate Interfaces
 # Activate Interfaces
@@ -2016,6 +2020,8 @@ ip link set eth3 up
 ip link set eth4 up
 ip link set eth5 up
 ip link set eth6 up
+ip link set eth7 up
+ip link set eth8 up
 
 # Activate IP Forwarding
 # Activate IP Forwarding
