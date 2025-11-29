@@ -67,24 +67,76 @@ SIEM_subnet="10.0.3.0/24"
 # SECTION 1: Environment Cleanup
 # =========================
 
+# =========================
+# SECTION 1: Environment Cleanup
+# =========================
+
 log_section "SECTION 1: Environment Cleanup"
 
-log_step "1/3" "Destroying previous containerlab setup..."
-sudo containerlab destroy --topo "$file_name" || true
+log_step "1/8" "Stopping all running MaJuVi containers..."
+RUNNING=$(sudo docker ps -q --filter "name=clab-MaJuVi" 2>/dev/null)
+if [ -n "$RUNNING" ]; then
+    echo "$RUNNING" | xargs -r sudo docker stop || true
+    log_ok "Containers stopped"
+else
+    log_info "No running containers found"
+fi
+
+log_step "2/8" "Destroying containerlab topology..."
+sudo containerlab destroy --topo "$file_name" --cleanup 2>/dev/null || true
+sudo containerlab destroy --all --cleanup 2>/dev/null || true
 log_ok "Containerlab destroyed"
 
-log_step "2/3" "Removing Docker leftovers..."
+log_step "3/8" "Removing all MaJuVi containers..."
+sudo docker ps -a --filter "name=clab-MaJuVi" -q 2>/dev/null | xargs -r sudo docker rm -f || true
 sudo docker container prune -f || true
-sudo docker network prune -f || true
-sudo docker volume prune -f || true
-log_ok "Docker resources cleaned"
+log_ok "All containers removed"
 
-log_step "3/3" "Removing data directories..."
-sudo rm -rf ./db-init ./webserver-details ./logstash || true
+log_step "4/8" "Removing containerlab networks..."
+sudo docker network ls --filter "name=clab-MaJuVi" -q 2>/dev/null | xargs -r sudo docker network rm 2>/dev/null || true
+sudo docker network ls --filter "name=mgmt-net" -q 2>/dev/null | xargs -r sudo docker network rm 2>/dev/null || true
+sudo docker network prune -f || true
+log_ok "Networks removed"
+
+log_step "5/8" "Removing all volumes..."
+sudo docker volume ls --filter "name=clab-MaJuVi" -q 2>/dev/null | xargs -r sudo docker volume rm 2>/dev/null || true
+sudo docker volume prune -f || true
+log_ok "Volumes removed"
+
+log_step "6/8" "Removing data directories..."
+sudo rm -rf ./db-init ./webserver-details ./logstash ./suricata 2>/dev/null || true
+sudo rm -f "$file_name" 2>/dev/null || true
 log_ok "Data directories removed"
 
+log_step "7/8" "Cleaning up bridge interfaces..."
+BRIDGES=$(ip link show 2>/dev/null | grep "br-" | awk -F': ' '{print $2}' | grep -v "@" || true)
+if [ -n "$BRIDGES" ]; then
+    echo "$BRIDGES" | while read -r bridge; do
+        sudo ip link set "$bridge" down 2>/dev/null || true
+        sudo ip link delete "$bridge" 2>/dev/null || true
+    done
+    log_ok "Bridge interfaces cleaned"
+else
+    log_info "No bridge interfaces to clean"
+fi
+
+log_step "8/8" "Verifying cleanup..."
+REMAINING=$(sudo docker ps -a --filter "name=clab-MaJuVi" -q 2>/dev/null | wc -l)
+if [ "$REMAINING" -eq 0 ]; then
+    log_ok "All containers removed "
+else
+    log_warn "$REMAINING containers still remaining"
+fi
+
+REMAINING_NET=$(sudo docker network ls --filter "name=clab-MaJuVi" -q 2>/dev/null | wc -l)
+if [ "$REMAINING_NET" -eq 0 ]; then
+    log_ok "All networks removed "
+else
+    log_warn "$REMAINING_NET networks still remaining"
+fi
+
 echo ""
-log_ok "Environment cleanup completed"
+log_ok "Environment cleanup completed (Docker images preserved)"
 
 
 # =========================
@@ -926,7 +978,6 @@ ip addr add 192.168.10.1/24 dev eth1 2>/dev/null || true   # Internal
 ip addr add 10.0.2.1/24 dev eth2 2>/dev/null || true       # DMZ
 ip addr add 192.168.20.1/24 dev eth3 2>/dev/null || true   # To External_FW
 ip addr add 10.0.3.2/30 dev eth4 || true                   # To SIEM_FW (.2 in .0-.3)
-ip addr add 10.0.3.2/30 dev eth4 || true                   # To SIEM_FW (.2 in .0-.3)
 ip link set eth1 up
 ip link set eth2 up
 ip link set eth3 up
@@ -1269,7 +1320,6 @@ echo "[4/7] Configuring network interfaces..."
 ip addr add 10.0.2.2/24 dev eth1 2>/dev/null || true      # DMZ
 ip addr add 172.168.3.2/30 dev eth2 2>/dev/null || true   # Router Edge
 ip addr add 192.168.20.2/24 dev eth4 2>/dev/null || true  # Internal_FW link
-ip addr add 10.0.3.6/30 dev eth3 || true                  # to SIEM_FW (.6 in .4-.7)
 ip addr add 10.0.3.6/30 dev eth3 || true                  # to SIEM_FW (.6 in .4-.7)
 ip link set eth1 up
 ip link set eth2 up
@@ -1614,7 +1664,7 @@ log_step "3/4" "Configuring Internal IDS..."
 log_info "Configuring Internal IDS"
 
 curl -L -o /tmp/filebeat-8.10.0-x86_64.rpm https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-8.10.0-x86_64.rpm
-docker cp /tmp/filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS2:/tmp/filebeat.rpm
+sudo docker cp /tmp/filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS2:/tmp/filebeat.rpm
 sudo docker exec -i clab-MaJuVi-IDS2 bash <<'EOF'
 set -e
 
@@ -1644,21 +1694,9 @@ filebeat.inputs:
 
 output.logstash:
   hosts: ["10.0.3.10:5044"]
-  loadbalance: true
-  bulk_max_size: 2048
-
-queue.mem:
-  events: 4096
-  flush.min_events: 512
-  flush.timeout: 1s
 
 path.data: /var/lib/filebeat
 logging.level: warning
-logging.to_files: true
-logging.files:
-  path: /var/log/filebeat
-  name: filebeat
-  keepfiles: 3
 FILEBEAT_CONFIG
 
 # Start Filebeat
@@ -1668,9 +1706,10 @@ sleep 2
 
 echo "[3/3] setting ip"
 ip addr add 10.0.2.10/24 dev eth1 || true
+ip addr add 10.0.3.30/30 dev eth2 || true
 ip link set eth1 up
-ip route replace default via 192.168.10.42 || true
-ip route add 10.0.3.0/24 via 10.0.3.5 dev eth3 || true
+ip link set eth2 up
+ip route add 10.0.3.0/24 via 10.0.3.29 dev eth2 || true
 
 echo ""
 echo "=========================================="
@@ -1681,7 +1720,7 @@ log_ok "Internal IDS configured"
 log_step "4/4" "Configuring DMZ IDS..."
 log_info "Configuring DMZ IDS"
 
-docker cp /tmp/filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS:/tmp/filebeat.rpm
+sudo docker cp /tmp/filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS:/tmp/filebeat.rpm
 sudo docker exec -i clab-MaJuVi-IDS bash <<'EOF'
 set -e
   
@@ -1711,21 +1750,10 @@ filebeat.inputs:
 
 output.logstash:
   hosts: ["10.0.3.10:5044"]
-  loadbalance: true
-  bulk_max_size: 2048
 
-queue.mem:
-  events: 4096
-  flush.min_events: 512
-  flush.timeout: 1s
 
 path.data: /var/lib/filebeat
 logging.level: warning
-logging.to_files: true
-logging.files:
-  path: /var/log/filebeat
-  name: filebeat
-  keepfiles: 3
 FILEBEAT_CONFIG
 
 # Start Filebeat
@@ -1735,9 +1763,10 @@ sleep 2
 
 echo "[3/3] setting ip"
 ip addr add 10.0.2.20/24 dev eth1 || true
+ip addr add 10.0.3.27/30 dev eth2 || true
 ip link set eth1 up
-ip route replace default via 10.0.2.42 || true
-ip route add 10.0.3.0/24 via 10.0.3.5 dev eth3 || true
+ip link set eth2 up
+ip route add 10.0.3.0/24 via 10.0.3.25 dev eth2 || true
 
 echo ""
 echo "=========================================="
@@ -1836,7 +1865,6 @@ tc filter add dev eth2 parent ffff: protocol all u32 match u32 0 0 action mirred
 tc qdisc add dev eth3 ingress
 tc filter add dev eth3 parent ffff: protocol all u32 match u32 0 0 action mirred egress mirror dev eth4
 EOF
-
 log_ok "DMZ Switch configured"
 
 # Database config
@@ -1914,6 +1942,10 @@ iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
 # --- Prevent Internal → Attacker (eth1) directly
 iptables -I FORWARD 1 -s 192.168.10.0/24 -d 200.168.1.0/24 -m conntrack --ctstate NEW -j DROP
 
+ip route add 192.168.10.0/24 via 172.168.2.2 || true
+ip route add 200.168.1.0/24 dev eth1 || true
+ip route add 172.168.3.0/24 via 172.168.2.2 dev eth2 || true
+
 # Routing
 ip route replace 192.168.10.0/24 via 172.168.3.2
 ip route replace 200.168.1.0/24 via 172.168.2.1
@@ -1929,7 +1961,6 @@ log_ok "router-edge configured"
 # Attacker host config
 log_section "SECTION 10: Configuring Attacker and router-internet..."
 log_step "1/2" "Configuring Attacker..."
-
 # Attacker host config
 log_info "Configuring Attacker"
 sudo docker exec -i clab-MaJuVi-Attacker sh <<EOF
@@ -2073,8 +2104,8 @@ iptables -A FORWARD -s 10.0.3.30 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack -
 iptables -A FORWARD -s 10.0.3.18 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
 
 # 6. IDS → Logstash (Port 5044)
-iptables -A FORWARD -s 10.0.2.42 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
-iptables -A FORWARD -s 192.168.10.42 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s 10.0.3.27 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s 10.0.3.30 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
 
 # 7.  Established/Related connections
 iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
@@ -2082,7 +2113,6 @@ iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 # 8. Log dropped packets
 iptables -A FORWARD -m limit --limit 5/min -j LOG --log-prefix "[SIEM_FW-DROP] " --log-level 7
 
-echo "SIEM_FW configured with restrictive micro-segmentation rules"
 EOF
 
 log_ok "SIEM_FW configured"
@@ -2154,7 +2184,6 @@ sudo nsenter -t $KIBANA_PID -n ip route show || true
 
 log_ok "Kibana configured"
 
-echo ""
 log_ok "SIEM components configured"
 
 # =========================
