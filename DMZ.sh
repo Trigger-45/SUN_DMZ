@@ -592,10 +592,6 @@ mgmt:
   network: mgmt-net
   ipv4-subnet: 172.20.20.0/24
 topology:
-    fi
-    exit 1
-fi
-
   nodes:
     # --- Interne Hosts ---
     Internal_Switch:
