@@ -1663,8 +1663,8 @@ log_ok "External Firewall configured"
 log_step "3/4" "Configuring Internal IDS..."
 log_info "Configuring Internal IDS"
 
-curl -L -o /tmp/filebeat-8.10.0-x86_64.rpm https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-8.10.0-x86_64.rpm
-sudo docker cp /tmp/filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS2:/tmp/filebeat.rpm
+curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-8.10.0-x86_64.rpm
+sudo docker cp filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS2:/tmp/filebeat.rpm
 sudo docker exec -i clab-MaJuVi-IDS2 bash <<'EOF'
 set -e
 
@@ -1672,14 +1672,13 @@ set -e
 echo "[1/3] Installing filebeat..."
 
 cd /tmp
-rpm -ivh filebeat.rpm
+rpm -ivh --force filebeat.rpm
 
 echo "[OK] Packages installed"
 
 # Configure Filebeat
 echo "[2/3] configure Filebeat..."
 cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
-filebeat modules enable suricata
 filebeat.inputs:
 - type: log
   enabled: true
@@ -1720,7 +1719,7 @@ log_ok "Internal IDS configured"
 log_step "4/4" "Configuring DMZ IDS..."
 log_info "Configuring DMZ IDS"
 
-sudo docker cp /tmp/filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS:/tmp/filebeat.rpm
+sudo docker cp filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS:/tmp/filebeat.rpm
 sudo docker exec -i clab-MaJuVi-IDS bash <<'EOF'
 set -e
   
@@ -1728,14 +1727,13 @@ set -e
 echo "[1/3] Installing filebeat..."
 
 cd /tmp
-rpm -ivh filebeat.rpm
+rpm -ivh --force filebeat.rpm
 
 echo "[OK] Packages installed"
 
 # Configure Filebeat
 echo "[2/3] configure Filebeat..."
 cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
-filebeat modules enable suricata
 filebeat.inputs:
 - type: log
   enabled: true
@@ -2191,3 +2189,6 @@ log_ok "SIEM components configured"
 # =========================
 log_section "SECTION 12: Lab deployment and configuration completed"
 log_ok "Lab deployment and configuration completed"
+
+
+
