@@ -1520,98 +1520,165 @@ iptables -t nat -F
 iptables -X 2>/dev/null || true
 
 # Set policies
+iptables -F
+iptables -t nat -F
+iptables -X 2>/dev/null || true
+
+# Policies
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT ACCEPT
 
+# ============================================
 # INPUT Chain
+# ============================================
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/sec -j ACCEPT
 iptables -A INPUT -p tcp --dport 22 -s 10.0.2.0/24 -j ACCEPT
 iptables -A INPUT -p tcp --dport 22 -s 192.168.20.0/24 -j ACCEPT
 
-# **NUR die Firewall selbst blocken, NICHT forwarded pings:**
-# iptables -A INPUT -i eth2 -p icmp --icmp-type echo-request -j DROP
+iptables -A INPUT -m limit --limit 1000/min --limit-burst 2000 -j NFLOG \
+  --nflog-prefix "[EXT-FW-INPUT-DROP] " --nflog-group 0
+iptables -A INPUT -j DROP
 
-# Log INPUT drops
-iptables -A INPUT -m limit --limit 5/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INPUT-DROP] " \
-  --nflog-group 0
-
+# ============================================
 # FORWARD Chain
-# Invalid packets
+# ============================================
+
+# Invalid
 iptables -N LOG_INVALID
-iptables -A LOG_INVALID -m limit --limit 10/min --limit-burst 20 -j NFLOG \
-  --nflog-prefix "[EXT-FW-INVALID-DROP] " \
-  --nflog-group 0
+iptables -A LOG_INVALID -m limit --limit 1000/min --limit-burst 2000 -j NFLOG \
+  --nflog-prefix "[EXT-FW-INVALID] " --nflog-group 0
 iptables -A LOG_INVALID -j DROP
 iptables -A FORWARD -m conntrack --ctstate INVALID -j LOG_INVALID
 
 # Established/Related
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED \
+  -m limit --limit 500/min --limit-burst 1000 -j NFLOG \
+  --nflog-prefix "[EXT-FW-ESTABLISHED] " --nflog-group 0
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# Port Forwarding for Webserver (Port 80)
-# Allow forwarded traffic to DMZ webserver
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INET-TO-WEB-ALLOW] " \
-  --nflog-group 0
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
+# ============================================
+# Internet → Webserver (Port 443) - MIT DoS-SCHUTZ! 
+# ============================================
 
-# Allow ICMP (ping) to Webserver - NUR zum Webserver selbst, nicht weitergeleitet
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INET-TO-WEB-ICMP] " \
-  --nflog-group 0
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request -m conntrack --ctstate NEW -j ACCEPT
+# NEUE REGEL: Rate Limiting für neue Connections! 
+# Erlaubt nur 20 neue Connections pro Minute pro IP
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
+  -m conntrack --ctstate NEW \
+  -m recent --name webserver_dos --set
 
-# **NEU: Block ICMP to internal network (verhindert Ping-Weiterleitung)**
-iptables -A FORWARD -i eth2 -o eth1 -d 192.168.10.0/24 -p icmp -m limit --limit 5/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INET-TO-INTERN-ICMP-DROP] " \
-  --nflog-group 0
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
+  -m conntrack --ctstate NEW \
+  -m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
+  -j NFLOG --nflog-prefix "[EXT-FW-WEB-DOS-BLOCK] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
+  -m conntrack --ctstate NEW \
+  -m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
+  -j DROP
+
+# Globales Limit für ALLE neuen Connections zum Webserver
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
+  -m conntrack --ctstate NEW \
+  -m limit --limit 50/sec --limit-burst 100 \
+  -j NFLOG --nflog-prefix "[EXT-FW-WEB-ACCEPT] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
+  -m conntrack --ctstate NEW \
+  -m limit --limit 50/sec --limit-burst 100 \
+  -j ACCEPT
+
+# Alles darüber wird geblockt und geloggt
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
+  -m limit --limit 1000/min --limit-burst 2000 \
+  -j NFLOG --nflog-prefix "[EXT-FW-WEB-RATELIMIT-DROP] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 -j DROP
+
+# ============================================
+# Internet → Webserver (ICMP) - MIT Schutz
+# ============================================
+
+# ICMP Rate Limiting - nur 10 pro Sekunde
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request \
+  -m limit --limit 10/sec --limit-burst 20 \
+  -j NFLOG --nflog-prefix "[EXT-FW-WEB-ICMP-ACCEPT] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request \
+  -m limit --limit 10/sec --limit-burst 20 \
+  -j ACCEPT
+
+# ICMP darüber blocken
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request \
+  -m limit --limit 1000/min --limit-burst 2000 \
+  -j NFLOG --nflog-prefix "[EXT-FW-WEB-ICMP-DROP] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p icmp --icmp-type echo-request -j DROP
+
+# ============================================
+# SYN Flood Protection
+# ============================================
+
+# SYN-Cookies aktivieren (außerhalb von iptables, im Host)
+# echo 1 > /proc/sys/net/ipv4/tcp_syncookies
+
+# SYN Rate Limiting
+iptables -A FORWARD -i eth2 -p tcp --syn \
+  -m limit --limit 30/sec --limit-burst 60 -j ACCEPT
+
+iptables -A FORWARD -i eth2 -p tcp --syn \
+  -m limit --limit 1000/min --limit-burst 2000 \
+  -j NFLOG --nflog-prefix "[EXT-FW-SYN-FLOOD-DROP] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -p tcp --syn -j DROP
+
+# ============================================
+# Blocks
+# ============================================
+
+iptables -A FORWARD -i eth2 -o eth1 -d 192.168.10.0/24 -p icmp \
+  -m limit --limit 1000/min --limit-burst 2000 -j NFLOG \
+  --nflog-prefix "[EXT-FW-INTERN-ICMP-DROP] " --nflog-group 0
 iptables -A FORWARD -i eth2 -o eth1 -d 192.168.10.0/24 -p icmp -j DROP
 
-# DMZ → Internet (NEW)
-iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-DMZ-TO-INET] " \
-  --nflog-group 0
+# DMZ → Internet
+iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW \
+  -m limit --limit 10/min --limit-burst 20 -j NFLOG \
+  --nflog-prefix "[EXT-FW-DMZ-TO-INET] " --nflog-group 0
 iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
 
-# Internal_FW → Internet (NEW)
-iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INTERN-TO-INET] " \
-  --nflog-group 0
+# Internal → Internet
+iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW \
+  -m limit --limit 10/min --limit-burst 20 -j NFLOG \
+  --nflog-prefix "[EXT-FW-INTERN-TO-INET] " --nflog-group 0
 iptables -A FORWARD -i eth4 -o eth2 -m conntrack --ctstate NEW -j ACCEPT
 
-# Internet → DMZ (other ports are being blocked)
-iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INET-TO-DMZ-DROP] " \
-  --nflog-group 0
+# Internet → DMZ (other)
+iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW \
+  -m limit --limit 1000/min --limit-burst 2000 -j NFLOG \
+  --nflog-prefix "[EXT-FW-INET-TO-DMZ-DROP] " --nflog-group 0
 iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate NEW -j DROP
 
-# Internet → Internal (blocked NEW connections)
-iptables -A FORWARD -i eth2 -o eth4 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INET-TO-INTERN-DROP] " \
-  --nflog-group 0
+# Internet → Internal
+iptables -A FORWARD -i eth2 -o eth4 -m conntrack --ctstate NEW \
+  -m limit --limit 1000/min --limit-burst 2000 -j NFLOG \
+  --nflog-prefix "[EXT-FW-INET-TO-INTERN-DROP] " --nflog-group 0
 iptables -A FORWARD -i eth2 -o eth4 -m conntrack --ctstate NEW -j DROP
 
-# Catch-all FORWARD drops
-iptables -A FORWARD -m limit --limit 5/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-FORWARD-DROP] " \
-  --nflog-group 0
+# Catch-all
+iptables -A FORWARD -m limit --limit 500/min --limit-burst 1000 -j NFLOG \
+  --nflog-prefix "[EXT-FW-CATCHALL-DROP] " --nflog-group 0
+iptables -A FORWARD -j DROP
 
-# NAT Configuration
+# ============================================
+# NAT
+# ============================================
 
-# DNAT: Virtuelle öffentliche IP 172.168.3.5 → Webserver 10.0.2.30
-# Für ICMP (Ping)
 iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p icmp --icmp-type echo-request -j DNAT --to-destination 10.0.2.30
-
-# Für HTTP (Port 80)
-iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p tcp --dport 80 -j DNAT --to-destination 10.0.2.30:80
-
-# SNAT: Antworten vom Webserver erscheinen als 172.168.3.5
+iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p tcp --dport 443 -j DNAT --to-destination 10.0.2.30:443
 iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.30 -j SNAT --to-source 172.168.3.5
-
-# MASQUERADE für ausgehenden Traffic (Internal/DMZ → Internet)
 iptables -t nat -A POSTROUTING -o eth2 -s 192.168.10.0/24 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.0/24 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o eth2 -s 192.168.20.0/24 -j MASQUERADE
