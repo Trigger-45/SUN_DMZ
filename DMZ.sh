@@ -200,96 +200,6 @@ log_ok "Database initialization SQL created."
 # Create Webserver
 log_step "2/4" "Creating Webserver Flask app and Dockerfile..."
 
-log_info "Creating start.sh script..."
-cat << 'EOF' > ./webserver-details/start.sh
-#!/bin/sh
-python3 /app/app.py &
-sleep 1
-nginx -g "daemon off;"
-EOF
-log_ok "Start script created."
-
-
-
-cat << 'EOF' > ./webserver-details/modsecurity.conf
-
-# Include ModSecurity base configuration from the OWASP CRS image
-Include /opt/owasp-crs/modsecurity.conf
-
-# Phase 1: REQUEST_HEADERS Analysis
-# SecRule PHASE 1: Analyze HTTP Request Headers
-SecDefaultAction phase:1,log,deny,status:403
-
-# Block attempts to access known backdoors (Phase 1)
-SecRule REQUEST_URI "@beginsWith /cgi/backdoor.php" \
-    "id:1000,phase:1,t:lowercase,deny,msg:'Backdoor access attempt blocked'"
-
-# Block web shells access attempts
-SecRule REQUEST_URI "@beginsWith /cgi/shell.php" \
-    "id:1001,phase:1,t:lowercase,deny,msg:'Web shell access attempt blocked'"
-
-# Phase 2: REQUEST_BODY Analysis  
-# SecRule PHASE 2: Analyze HTTP Request Body for SQL Injection and XSS
-SecDefaultAction phase:2,log,deny,status:403
-
-# SQL Injection Detection: UNION SELECT pattern
-SecRule REQUEST_BODY "@rx (?i)union.*select.*from" \
-    "id:1010,phase:2,deny,msg:'SQL Injection - UNION SELECT detected'"
-
-# XSS Detection in Request Body
-SecRule REQUEST_BODY "@contains <script>" \
-    "id:1011,phase:2,deny,msg:'XSS attack detected in request body'"
-
-# SQL Injection alternative pattern: OR 1=1
-SecRule ARGS "@rx (?i).*'\\s+or\\s+1\\s*=\\s*1" \
-    "id:1012,phase:2,deny,msg:'SQL Injection - OR 1=1 pattern detected'"
-
-# Phase 3: RESPONSE_HEADERS Analysis
-# SecRule PHASE 3: Check security headers
-SecDefaultAction phase:3,log,deny,status:500
-
-# Ensure CORS header is not set to wildcard (insecure)
-SecRule RESPONSE_HEADERS:Access-Control-Allow-Origin "@rx \\*" \
-    "id:2000,phase:3,deny,msg:'Insecure CORS header detected'"
-
-# Phase 4: RESPONSE_BODY Analysis
-# SecRule PHASE 4: Analyze HTTP Response Body for data leakage
-SecDefaultAction phase:4,log,deny,status:500flaskapp
-
-# Detect XSS in response body
-SecRule RESPONSE_BODY "@rx <script.*?>.*?</script>" \
-    "id:3000,phase:4,deny,msg:'Reflected XSS detected in response'"
-
-# Phase 5: LOGGING Configuration
-SecAuditEngine RelevantOnly
-SecAuditLogParts ABIFHZ
-SecAuditLog /var/log/audit/audit.log
-SecAuditLogFormat JSON
-
-# HTTP Flood Protection
-SecRequestBodyLimit 10485760
-SecRequestBodyLimitAction Reject
-
-# Disable ModSecurity version reporting
-SecStatusEngine Off
-
-# Include OWASP CRS setup configuration
-Include /opt/owasp-crs/crs-setup.conf
-
-# Include all OWASP CRS rules
-Include /opt/owasp-crs/rules/*.conf
-EOF
-
-log_ok "ModSecurity configuration created with lecture-based rules (pages 40-58)"
-
-log_info "Enabling ModSecurity rule engine..."
-cat << 'EOF' >> ./webserver-details/modsecurity.conf
-
-# Enable the ModSecurity rule engine in active mode (not detection-only)
-SecRuleEngine On
-EOF
-log_ok "ModSecurity rule engine enabled (On)"
-
 log_info "Creating Flask app..."
 cat << 'EOF' > ./webserver-details/app.py
 from flask import Flask, request, render_template_string, redirect, url_for, session
@@ -497,91 +407,9 @@ EOF
 
 log_ok "Flask app created."
 
-log_info "Creating nginx.conf"
-cat << 'EOF' > ./webserver-details/nginx.conf
-upstream app_backend {
-  server 127.0.0.1:5000;
-}
-
-server {
-    listen 80 default_server;
-    server_name _;
-    return 301 https://\$host\$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name _;
-    
-    ssl_certificate /etc/nginx/cert.crt;
-    ssl_certificate_key /etc/nginx/cert.key;
-
-    # Hardening: TLS 1.2/1.3 Only & Strong Ciphers (State of the Art)
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
-    ssl_session_cache shared:SSL:10m;
-    
-    # Dual Logging: File (Host) + Stdout (Docker)
-    access_log /var/log/nginx/access.log combined;
-    access_log /proc/1/fd/1 combined;
-    error_log /var/log/nginx/error.log warn;
-    error_log /proc/1/fd/2 warn;
-
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header Strict-Transport-Security "max-age=31536000" always;
-
-    location / {
-        proxy_pass http://app_backend;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-    }
-    
-    location /waf-health {
-        access_log off;
-        return 200 "WAF OK";
-    }
-}
-EOF
-log_ok "nginx.conf created."
-
-log_info "Creating Dockerfile for Webserver with ModSecurity WAF..."
-cat << 'EOF' > ./webserver-details/Dockerfile
-FROM owasp/modsecurity-crs:nginx-alpine
-
-USER root
-
-WORKDIR /app
-
-RUN apk add --no-cache python3 py3-flask py3-psycopg2 postgresql-dev libc-dev gcc openssl
-
-# Generate self-signed SSL certificate
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/cert.key \
-    -out /etc/nginx/cert.crt \
-    -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
-
-# Copy application files
-COPY modsecurity.conf /etc/modsecurity.d/override.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY start.sh /app/start.sh
-COPY app.py /app/app.py
-
-# Make start script executable
-RUN chmod +x /app/start.sh
-
-# Set environment variables for ModSecurity
-ENV MODSEC_RULE_ENGINE=On
-
-CMD ["/app/start.sh"]
-EOF
-log_ok "Dockerfile created with BACKEND pointing to Flask app."
+log_info "Creating Suricata configuration..."
 mkdir -p ./suricata/rules
 mkdir -p ./suricata/logs
-
-log_info "Creating Suricata configuration..."
 cat << 'EOF' > ./suricata/suricata.yaml
 %YAML 1.1
 ---
@@ -596,7 +424,7 @@ vars:
     SQL_SERVERS: "$HOME_NET"
 
   port-groups:
-    HTTP_PORTS: "80"
+    HTTP_PORTS: "[80,443]"
     SHELLCODE_PORTS: "!80"
     SSH_PORTS: "22"
 
@@ -669,7 +497,7 @@ EOF
 log_ok "Suricata configuration created."
 
 # Main Logstash configuration
-log_step "4/4" "Creating Logstash configuration..."
+log_step "3/4" "Creating Logstash configuration..."
 log_info "Creating Logstash main configuration..."
 cat << 'EOF' > ./logstash/config/logstash.yml
 path.config: /usr/share/logstash/pipeline/*.conf
@@ -768,25 +596,27 @@ output {
 EOF
 log_ok "Logstash configuration created."
 
+log_step "4/4" "Creating webserver SSL certificates..."
+log_info "Creating self-signed SSL certificates for webserver..."
+openssl req -x509 -nodes -days 365 \
+  -newkey rsa:2048 \
+  -keyout ./webserver-details/server.key \
+  -out ./webserver-details/server.crt \
+  -subj "/CN=example.local"
+chmod 0777 ./webserver-details/server.crt
+chmod 0777 ./webserver-details/server.key
+log_ok "SSL certificates created."
+
 echo ""
 log_ok "Creation of required Files completed."
 
-# =========================
-# SECTION 3: Building Webserver Docker Image
-# =========================
-log_subsection "SECTION 3: Building Webserver Docker Image"
-
-log_info "Building Webserver-waf-proxy Docker image...(this may take a minute)"
-sudo docker build -t webserver-waf-proxy ./webserver-details
-log_ok "Webserver-waf-proxy Docker image built."
 
 # =========================
-# SECTION 4: Deploy Containerlab Topology and Configure Nodes
+# SECTION 3: Deploy Containerlab Topology and Configure Nodes
 # =========================
 
 # Create topology file
-log_section "SECTION 4: Deploy Containerlab Topology and Configure Nodes"
-
+log_section "SECTION 3: Deploy Containerlab Topology and Configure Nodes"
 # Create topology file
 log_info "Creating topology file: ${file_name}"
 cat << 'EOF' > "$file_name"
@@ -844,12 +674,47 @@ topology:
       cap-add:
         - NET_ADMIN
         - NET_RAW
-    Web_Proxy_WAF:
+    Flask_Webserver:
       kind: linux
-      image: webserver-waf-proxy
+      image: nginx:latest
       group: server
       ports:
-        - "8181:5000"
+        - "5000:5000"
+      cap-add:
+        - NET_ADMIN
+    Proxy_WAF:
+      kind: linux
+      image: owasp/modsecurity-crs:nginx
+      group: server
+      ports:
+        - "8080:443"
+      env:
+        MODSECURITY_SEC_AUDIT_ENGINE: "On"
+        MODSECURITY_SEC_AUDIT_LOG: "/var/log/modsecurity/audit.log"
+        BACKEND: "http://10.0.2.10:5000"
+        MODSEC_RULE_ENGINE: "On"
+        PARANOIA: "2"
+        ANOMALY_INBOUND: "5"
+        ANOMALY_OUTBOUND: "4"
+        BLOCKING_PARANOIA: "2"
+        EXECUTING_PARANOIA: "2"
+        DETECTION_PARANOIA: "2"
+        MODSEC_RESP_BODY_ACCESS: "On"
+        MODSEC_REQ_BODY_ACCESS: "On"
+        MAX_FILE_SIZE: "10485760"
+        MAX_NUM_ARGS: "300"
+        ARG_NAME_LENGTH: "256"
+        ARG_LENGTH: "4000"
+        TOTAL_ARG_LENGTH: "64000"
+        COMBINED_FILE_SIZES: "52428800"
+        RESTRICTED_EXTENSIONS: ".asa/ .asax/ .ascx/ .backup/ .bak/ .bat/ .cdx/ .cer/ .cfg/ .cmd/ .com/ .config/ .conf/ .cs/ .csproj/ .csr/ .dat/ .db/ .dbf/ .dll/ .dos/ .htr/ .htw/ .ida/ .idc/ .idq/ .inc/ .ini/ .key/ .licx/ .lnk/ .log/ .mdb/ .old/ .pass/ .pdb/ .pol/ .printer/ .pwd/ .rdb/ .resources/ .resx/ .sql/ .swp/ .sys/ .vb/ .vbs/ .vbproj/ .vsdisco/ .webinfo/ .xsd/ .xsx/"
+        RESTRICTED_HEADERS: "/proxy/ /lock-token/ /content-range/ /if/"
+        ALLOWED_METHODS: "GET HEAD POST OPTIONS"
+        ALLOWED_REQUEST_CONTENT_TYPE: "|application/x-www-form-urlencoded| |multipart/form-data| |multipart/related| |text/xml| |application/xml| |application/soap+xml| |application/json| |application/cloudevents+json| |application/cloudevents-batch+json|"
+        ENFORCE_BODYPROC_URLENCODED: "1"
+      binds:
+        - ./webserver-details/server.crt:/etc/nginx/conf/server.crt:rw
+        - ./webserver-details/server.key:/etc/nginx/conf/server.key:rw
       cap-add:
         - NET_ADMIN
     Database:
@@ -976,8 +841,10 @@ topology:
     - endpoints: ["Internal_FW:eth2", "DMZ_Switch:eth1"]
     - endpoints: ["Internal_FW:eth3", "External_FW:eth4"]
     - endpoints: ["DMZ_Switch:eth2", "External_FW:eth1"]
-    - endpoints: ["Web_Proxy_WAF:eth1", "DMZ_Switch:eth3"]
-    - endpoints: ["Database:eth1", "Web_Proxy_WAF:eth2"]
+    - endpoints: ["Proxy_WAF:eth1", "DMZ_Switch:eth3"]
+    - endpoints: ["Proxy_WAF:eth3", "SIEM_FW:eth9"]
+    - endpoints: ["Flask_Webserver:eth1", "Proxy_WAF:eth2"]
+    - endpoints: ["Database:eth1", "Flask_Webserver:eth2"]
     - endpoints: ["IDS:eth1", "DMZ_Switch:eth4"]
     - endpoints: ["IDS:eth2", "SIEM_FW:eth7"]
     - endpoints: ["IDS2:eth1", "Internal_Switch:eth4"]
@@ -992,7 +859,7 @@ topology:
     - endpoints: ["router-edge:eth2", "External_FW:eth2"]
     - endpoints: ["SIEM_FW:eth4", "elasticsearch:eth3"]
     - endpoints: ["SIEM_FW:eth5", "kibana:eth2"]
-    - endpoints: ["Admin_PC:eth1", "SIEM_FW:eth6"]
+    - endpoints: ["Admin_PC:eth1", "SIEM_FW:eth6"] 
 EOF
 
 log_ok "Topology file '${file_name}' created successfully"
@@ -1007,9 +874,9 @@ echo ""
 log_ok "Containerlab topology deployed successfully"
 
 # =========================
-# SECTION 5: Wait for Elasticsearch to be ready
-# =========================
-log_subsection "SECTION 5: Wait for Elasticsearch to be ready"
+# SECTION 4: Wait for Elasticsearch to be ready
+# ========================= 
+log_subsection "SECTION 4: Wait for Elasticsearch to be ready"
 log_info "Waiting for Elasticsearch to be ready (this may take a couple of minutes)..."
 until sudo docker exec clab-MaJuVi-elasticsearch curl -s http://localhost:9200/_cluster/health | grep -q '"status":"green"'; do
   sudo docker exec clab-MaJuVi-elasticsearch curl -s http://localhost:9200/_cluster/health || true
@@ -1020,10 +887,10 @@ echo ""
 log_ok "Elasticsearch cluster reports green"
 
 # =========================
-# SECTION 6: Configure Internal and External Firewall and IDS
+# SECTION 5: Configure Internal and External Firewall and IDS
 # =========================
-log_section "SECTION 6: Configure Internal and External Firewall and IDS"
-log_step "1/4" "Configuring Internal Firewall..."
+log_section "SECTION 5: Configure Internal, External and Web Application Firewall and IDS"
+log_step "1/5" "Configuring Internal Firewall..."
 log_info "Configuring Internal Firewall"
 sudo docker exec -i clab-MaJuVi-Internal_FW bash <<'EOF'
 set -e
@@ -1194,17 +1061,12 @@ iptables -A FORWARD -m conntrack --ctstate INVALID -j LOG_INVALID
 # Established/Related
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[INT-FW-INTERN-TO-WEB-80] " \
-  --nflog-group 0
-iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
 
-# Internal → DMZ: Allow HTTPS (port 443) to Webserver
-iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 443 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[INT-FW-INTERN-TO-WEB-443] " \
+# Internal → DMZ: Allow HTTPS (port 8443) to Webserver
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 8443 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
+  --nflog-prefix "[INT-FW-INTERN-TO-WEB-8443] " \
   --nflog-group 0
-iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 443 -m conntrack --ctstate NEW -j ACCEPT
-
+iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p tcp --dport 8443 -m conntrack --ctstate NEW -j ACCEPT
 # Internal → DMZ: Allow ICMP (ping) to Webserver
 iptables -A FORWARD -i eth1 -o eth2 -d 10.0.2.30 -p icmp --icmp-type echo-request -m limit --limit 10/min -j NFLOG \
   --nflog-prefix "[INT-FW-INTERN-TO-WEB-ICMP] " \
@@ -1381,7 +1243,7 @@ EOF
 
 log_ok "Internal Firewall configured"
 
-log_step "2/4" "Configuring External Firewall..."
+log_step "2/5" "Configuring External Firewall..."
 log_info "Configuring External Firewall"
 sudo docker exec -i clab-MaJuVi-External_FW bash <<'EOF'
 set -e
@@ -1409,7 +1271,21 @@ apt-get install -y --no-install-recommends \
 echo "[OK] Packages installed"
 
 
-echo "[2/7] Installing Filebeat..."
+echo "[2/7] Installing Filebeat..."apt-get update -qq 2>&1 | tail -5
+apt-get install -y --no-install-recommends \
+    iptables \
+    iproute2 \
+    iputils-ping \
+    net-tools \
+    ulogd2 \
+    ulogd2-json \
+    wget \
+    curl \
+    bash \
+    procps \
+    gnupg \
+    ca-certificates \
+    2>&1 | tail -10
 # Install Filebeat
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
 echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list
@@ -1559,36 +1435,12 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED \
   --nflog-prefix "[EXT-FW-ESTABLISHED] " --nflog-group 0
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# ============================================
-# Internet → Webserver (Port 443) - MIT DoS-SCHUTZ! 
-# ============================================
-
-# NEUE REGEL: Rate Limiting für neue Connections! 
-# Erlaubt nur 20 neue Connections pro Minute pro IP
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
-  -m conntrack --ctstate NEW \
-  -m recent --name webserver_dos --set
-
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
-  -m conntrack --ctstate NEW \
-  -m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
-  -j NFLOG --nflog-prefix "[EXT-FW-WEB-DOS-BLOCK] " --nflog-group 0
-
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
-  -m conntrack --ctstate NEW \
-  -m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
-  -j DROP
-
-# Globales Limit für ALLE neuen Connections zum Webserver
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
-  -m conntrack --ctstate NEW \
-  -m limit --limit 50/sec --limit-burst 100 \
-  -j NFLOG --nflog-prefix "[EXT-FW-WEB-ACCEPT] " --nflog-group 0
-
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
-  -m conntrack --ctstate NEW \
-  -m limit --limit 50/sec --limit-burst 100 \
-  -j ACCEPT
+# Port Forwarding for Webserver (Port 443)
+# Allow forwarded traffic to DMZ webserver
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
+  --nflog-prefix "[EXT-FW-INET-TO-WEB-ALLOW] " \
+  --nflog-group 0
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 -m conntrack --ctstate NEW -j ACCEPT
 
 # Alles darüber wird geblockt und geloggt
 iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
@@ -1677,7 +1529,11 @@ iptables -A FORWARD -j DROP
 # ============================================
 
 iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p icmp --icmp-type echo-request -j DNAT --to-destination 10.0.2.30
+
+# Für HTTPS (Port 443)
 iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p tcp --dport 443 -j DNAT --to-destination 10.0.2.30:443
+
+# SNAT: Antworten vom Webserver erscheinen als 172.168.3.5
 iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.30 -j SNAT --to-source 172.168.3.5
 iptables -t nat -A POSTROUTING -o eth2 -s 192.168.10.0/24 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.0/24 -j MASQUERADE
@@ -1834,7 +1690,87 @@ echo "=========================================="
 EOF
 log_ok "External Firewall configured"
 
-log_step "3/4" "Configuring Internal IDS..."
+log_step "3/5" "Configuring WAF..."
+log_info "Configuring WAF"
+
+sudo docker exec -u 0 -i clab-MaJuVi-Proxy_WAF bash <<'EOF'
+set -e
+
+
+# Install filebeat
+
+echo "[1/3] Installing filebeat..."
+
+apt-get update -qq 2>&1 | tail -5
+apt-get install -y --no-install-recommends \
+    iptables \
+    iproute2 \
+    iputils-ping \
+    net-tools \
+    ulogd2 \
+    ulogd2-json \
+    wget \
+    curl \
+    bash \
+    procps \
+    gnupg \
+    openssl \
+    ca-certificates \
+    2>&1 | tail -10
+
+# Install Filebeat
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list
+
+
+apt-get update -qq
+apt-get install -y filebeat 2>&1 | tail -10
+
+
+echo "[OK] Packages installed"
+
+# Configure Filebeat
+echo "[2/3] configure Filebeat..."
+
+cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/audit/audit.log
+  json.keys_under_root: true
+  json.add_error_key: true
+  fields:
+    firewall: waf
+    log_type: firewall
+  fields_under_root: true
+
+output.logstash:
+  hosts: ["10.0.3.10:5044"]
+
+path.data: /var/lib/filebeat
+logging.level: warning
+FILEBEAT_CONFIG
+
+chmod 644 /etc/filebeat/filebeat.yml
+
+# Start Filebeat
+nohup filebeat -e -c /etc/filebeat/filebeat.yml > /var/log/filebeat.log 2>&1 &
+FILEBEAT_PID=$!
+sleep 2
+
+echo "[3/3] setting ip"
+ip addr add 10.0.3.34/30 dev eth3 || true
+ip link set eth3 up
+ip route add 10.0.3.0/24 via 10.0.3.33 dev eth3 || true
+
+echo ""
+echo "=========================================="
+
+EOF
+log_ok "WAF configured"
+
+log_step "4/5" "Configuring Internal IDS..."
 log_info "Configuring Internal IDS"
 
 curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-8.10.0-x86_64.rpm
@@ -1890,7 +1826,7 @@ echo "=========================================="
 EOF
 log_ok "Internal IDS configured"
 
-log_step "4/4" "Configuring DMZ IDS..."
+log_step "5/5" "Configuring DMZ IDS..."
 log_info "Configuring DMZ IDS"
 
 sudo docker cp filebeat-8.10.0-x86_64.rpm clab-MaJuVi-IDS:/tmp/filebeat.rpm
@@ -1928,14 +1864,17 @@ path.data: /var/lib/filebeat
 logging.level: warning
 FILEBEAT_CONFIG
 
-# Start Filebeat
+
+
+echo 1 > /proc/sys/net/ipv4/ip_forward
 nohup filebeat -e -c /etc/filebeat/filebeat.yml > /var/log/filebeat.log 2>&1 &
 FILEBEAT_PID=$!
 sleep 2
 
-echo "[3/3] setting ip"
+
+echo 1 > /proc/sys/net/ipv4/ip_forward
 ip addr add 10.0.2.20/24 dev eth1 || true
-ip addr add 10.0.3.27/30 dev eth2 || true
+ip addr add 10.0.3.26/30 dev eth2 || true
 ip link set eth1 up
 ip link set eth2 up
 ip route add 10.0.3.0/24 via 10.0.3.25 dev eth2 || true
@@ -1949,12 +1888,11 @@ log_ok "DMZ IDS configured"
 log_ok "Configuration of Firewalls and IDS completed"
 
 # =========================
-# SECTION 7: Configuring Internal Hosts and Switches
+# SECTION 6: Configuring Internal Hosts and Switches
 # =========================
 
 # Internal Clients (IP + default route)
-log_section "SECTION 7: Configuring Internal Hosts and Switches..."
-
+log_section "SECTION 6: Configuring Internal Hosts and Switches..."
 # Internal Clients (IP + default route)
 log_step "1/2" "Configuring Internal Clients..."
 log_info "Configuring Internal Clients..."
@@ -2005,12 +1943,11 @@ EOF
 log_ok "Internal Hosts and Switches configured"
 
 # =========================
-# SECTION 8: Configuring DMZ
+# SECTION 7: Configuring DMZ
 # =========================
 
 # DMZ Switch config
-log_section "SECTION 8: Configuring DMZ..."
-
+log_section "SECTION 7: Configuring DMZ..."
 # DMZ Switch config
 log_step "1/3" "Configuring DMZ Switch..."
 log_info "Configurating DMZ Switch"
@@ -2048,7 +1985,7 @@ elif command -v apk >/dev/null 2>&1; then
   apk add --no-cache iproute2 iputils >/dev/null 2>&1 || true
 fi
 
-ip addr add 10.0.2.10/24 dev eth1 || true
+ip addr add 10.0.2.70/24 dev eth1 || true
 ip link set eth1 up
 ip route replace default via 10.0.2.1 || true
 EOF
@@ -2056,11 +1993,12 @@ EOF
 log_ok "Database configured"
 
 # Webserver config
-log_step "3/3" "Configuring Webserver..."
-log_info "Configuring Webserver"
-sudo docker exec -i --user root clab-MaJuVi-Web_Proxy_WAF sh <<'EOF'
+log_step "3/3" "Configuring Modsecurity..."
+log_info "Configuring Modsecurity"
+sudo docker exec -i --user root clab-MaJuVi-Proxy_WAF sh <<'EOF'
 set -e
-apk add --no-cache iproute2 iputils tcpdump >/dev/null 2>&1 || true
+
+
 
 ip addr add 10.0.2.30/24 dev eth1 || true
 ip addr add 10.0.2.60/24 dev eth2 || true
@@ -2072,16 +2010,49 @@ ip route add 192.168.10.0/24 via 10.0.2.1 dev eth1 || true
 ip route replace default via 10.0.2.2 || true
 ip route add 10.0.2.10 via 10.0.2.60 dev eth2 || true
 EOF
+log_ok "WAF to Flask_Webserver configured"
 
-log_ok "Webserver configured"
+log_info "Configuring Flask Webserver"
+sudo docker exec -i --user root clab-MaJuVi-Flask_Webserver mkdir -p /app
+sudo docker cp ./webserver-details/app.py clab-MaJuVi-Flask_Webserver:/app/app.py
+sudo docker exec -i --user root clab-MaJuVi-Flask_Webserver sh <<'EOF'
+set -e
 
+#install dependencies
+echo "[1/2] Installing dependencies..."
+apt-get update && \
+apt-get install -y --no-install-recommends \
+    iproute2 \
+    iputils-ping \
+    python3 \
+    python3-flask \
+    python3-psycopg2 \
+    libpq-dev \
+    build-essential \
+    openssl \
+    2>&1 | tail -10
+
+echo "[OK] Dependencies installed"
+#start webserver on port 5000
+cd /app && python3 app.py &
+
+ip addr add 10.0.2.10/24 dev eth1 || true
+ip addr add 10.0.2.50/24 dev eth2 || true
+ip link set eth1 up
+ip link set eth2 up
+
+ip route replace default via 10.0.2.60 || true
+ip route add 10.0.2.70 via 10.0.2.50 dev eth2 || true
+
+EOF
+echo "[OK] Flask Webserver started"
 echo ""
 log_ok "DMZ configured"
 
 # =========================
-# SECTION 9: Configuring Router-edge
+# SECTION 8: Configuring Router-edge
 # =========================
-log_section "SECTION 9: Configuring Router-edge..."
+log_section "SECTION 8: Configuring Router-edge..."
 # router-edge configuration
 log_info "Configuring router-edge"
 sudo docker exec -i clab-MaJuVi-router-edge sh <<'EOF'
@@ -2123,11 +2094,11 @@ EOF
 log_ok "router-edge configured"
 
 # =========================
-# SECTION 10: Configuring Attacker and router-internet
+# SECTION 9: Configuring Attacker and router-internet
 # =========================#
 
 # Attacker host config
-log_section "SECTION 10: Configuring Attacker and router-internet..."
+log_section "SECTION 9: Configuring Attacker and router-internet..."
 log_step "1/2" "Configuring Attacker..."
 # Attacker host config
 log_info "Configuring Attacker"
@@ -2183,9 +2154,9 @@ log_ok "Attacker and router-internet configured"
 
 
 # =========================
-# SECTION 11: Configuring SIEM components
+# SECTION 10: Configuring SIEM components
 # =========================
-log_section "SECTION 11: Configuring SIEM components..."
+log_section "SECTION 10: Configuring SIEM components..."
 
 # Configure SIEM_FW
 log_step "1/5" "Configuring SIEM_FW..."
@@ -2210,7 +2181,7 @@ ip addr add 10.0.3.17/30 dev eth5 || true
 ip addr add 10.0.3.21/30 dev eth6 || true
 ip addr add 10.0.3.25/30 dev eth7 || true
 ip addr add 10.0.3.29/30 dev eth8 || true
-
+ip addr add 10.0.3.33/30 dev eth9 || true
 # Activate Interfaces
 # Activate Interfaces
 ip link set eth1 up
@@ -2221,6 +2192,7 @@ ip link set eth5 up
 ip link set eth6 up
 ip link set eth7 up
 ip link set eth8 up
+ip link set eth9 up
 
 # Activate IP Forwarding
 # Activate IP Forwarding
@@ -2355,9 +2327,9 @@ log_ok "Kibana configured"
 log_ok "SIEM components configured"
 
 # =========================
-# SECTION 12: Lab deployment and configuration completed
+# SECTION 11: Lab deployment and configuration completed
 # =========================
-log_section "SECTION 12: Lab deployment and configuration completed"
+log_section "SECTION 11: Lab deployment and configuration completed"
 log_ok "Lab deployment and configuration completed"
 
 
