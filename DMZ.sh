@@ -1423,18 +1423,17 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
 # Port Forwarding for Webserver (Port 443)
 # Allow forwarded traffic to DMZ webserver
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
   --nflog-prefix "[EXT-FW-INET-TO-WEB-ALLOW] " \
   --nflog-group 0
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 -m conntrack --ctstate NEW -j ACCEPT
 
 # Alles darüber wird geblockt und geloggt
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 \
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 \
   -m limit --limit 1000/min --limit-burst 2000 \
   -j NFLOG --nflog-prefix "[EXT-FW-WEB-RATELIMIT-DROP] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 443 -j DROP
-
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 -j DROP
 # ============================================
 # Internet → Webserver (ICMP) - MIT Schutz
 # ============================================
@@ -1516,8 +1515,8 @@ iptables -A FORWARD -j DROP
 
 iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p icmp --icmp-type echo-request -j DNAT --to-destination 10.0.2.30
 
-# Für HTTPS (Port 443)
-iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p tcp --dport 443 -j DNAT --to-destination 10.0.2.30:443
+# Für HTTPS (Port 8443)
+iptables -t nat -A PREROUTING -i eth2 -d 172.168.3.5 -p tcp --dport 8443 -j DNAT --to-destination 10.0.2.30:8443
 
 # SNAT: Antworten vom Webserver erscheinen als 172.168.3.5
 iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.30 -j SNAT --to-source 172.168.3.5
@@ -1707,8 +1706,6 @@ apt-get install -y --no-install-recommends \
 # Install Filebeat
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
 echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list
-
-
 apt-get update -qq
 apt-get install -y filebeat 2>&1 | tail -10
 
@@ -1724,8 +1721,6 @@ filebeat.inputs:
   enabled: true
   paths:
     - /var/log/audit/audit.log
-  json.keys_under_root: true
-  json.add_error_key: true
   fields:
     firewall: waf
     log_type: firewall
@@ -1737,6 +1732,8 @@ output.logstash:
 path.data: /var/lib/filebeat
 logging.level: warning
 FILEBEAT_CONFIG
+
+
 
 chmod 644 /etc/filebeat/filebeat.yml
 
@@ -1860,10 +1857,10 @@ sleep 2
 
 echo 1 > /proc/sys/net/ipv4/ip_forward
 ip addr add 10.0.2.20/24 dev eth1 || true
-ip addr add 10.0.3.26/30 dev eth2 || true
+ip addr add 10.0.3.38/30 dev eth2 || true
 ip link set eth1 up
 ip link set eth2 up
-ip route add 10.0.3.0/24 via 10.0.3.25 dev eth2 || true
+ip route add 10.0.3.0/24 via 10.0.3.37 dev eth2 || true
 
 echo ""
 echo "=========================================="
@@ -2165,9 +2162,9 @@ ip addr add 10.0.3.9/30 dev eth3 || true
 ip addr add 10.0.3.13/30 dev eth4 || true
 ip addr add 10.0.3.17/30 dev eth5 || true
 ip addr add 10.0.3.21/30 dev eth6 || true
-ip addr add 10.0.3.25/30 dev eth7 || true
 ip addr add 10.0.3.29/30 dev eth8 || true
 ip addr add 10.0.3.33/30 dev eth9 || true
+ip addr add 10.0.3.37/30 dev eth7 || true
 # Activate Interfaces
 # Activate Interfaces
 ip link set eth1 up
@@ -2230,7 +2227,7 @@ iptables -A FORWARD -s 10.0.3.30 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack -
 iptables -A FORWARD -s 10.0.3.18 -d 10.0.3.26 -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
 
 # 6. IDS → Logstash (Port 5044)
-iptables -A FORWARD -s 10.0.3.27 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s 10.0.3.38 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
 iptables -A FORWARD -s 10.0.3.30 -d 10.0.3.10 -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
 
 # 7.  Established/Related connections
@@ -2317,6 +2314,3 @@ log_ok "SIEM components configured"
 # =========================
 log_section "SECTION 11: Lab deployment and configuration completed"
 log_ok "Lab deployment and configuration completed"
-
-
-
