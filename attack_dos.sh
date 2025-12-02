@@ -4,7 +4,7 @@ cat << 'EOF' > /tmp/dos_attack_simple.py
 #!/usr/bin/env python3
 """
 DoS Attack Script - HTTPS with curl
-Target: 172.168.3.5:443
+Target: 172.168.3.5:8443
 """
 
 import socket
@@ -15,7 +15,7 @@ import subprocess
 from datetime import datetime
 
 TARGET_IP = "172.168.3.5"
-TARGET_PORT = 443
+TARGET_PORT = 8443
 
 class DoS:
     def __init__(self):
