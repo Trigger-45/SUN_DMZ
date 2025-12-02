@@ -1421,12 +1421,36 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED \
   --nflog-prefix "[EXT-FW-ESTABLISHED] " --nflog-group 0
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# Port Forwarding for Webserver (Port 443)
-# Allow forwarded traffic to DMZ webserver
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-  --nflog-prefix "[EXT-FW-INET-TO-WEB-ALLOW] " \
-  --nflog-group 0
-iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 -m conntrack --ctstate NEW -j ACCEPT
+# ============================================
+# Internet → Webserver (Port 443) - MIT DoS-SCHUTZ! 
+# ============================================
+
+# NEUE REGEL: Rate Limiting für neue Connections! 
+# Erlaubt nur 20 neue Connections pro Minute pro IP
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 \
+  -m conntrack --ctstate NEW \
+  -m recent --name webserver_dos --set
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 \
+  -m conntrack --ctstate NEW \
+  -m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
+  -j NFLOG --nflog-prefix "[EXT-FW-WEB-DOS-BLOCK] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 \
+  -m conntrack --ctstate NEW \
+  -m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
+  -j DROP
+
+# Globales Limit für ALLE neuen Connections zum Webserver
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 \
+  -m conntrack --ctstate NEW \
+  -m limit --limit 50/sec --limit-burst 100 \
+  -j NFLOG --nflog-prefix "[EXT-FW-WEB-ACCEPT] " --nflog-group 0
+
+iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 \
+  -m conntrack --ctstate NEW \
+  -m limit --limit 50/sec --limit-burst 100 \
+  -j ACCEPT
 
 # Alles darüber wird geblockt und geloggt
 iptables -A FORWARD -i eth2 -o eth1 -d 10.0.2.30 -p tcp --dport 8443 \
