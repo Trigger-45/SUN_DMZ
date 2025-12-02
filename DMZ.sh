@@ -1271,21 +1271,7 @@ apt-get install -y --no-install-recommends \
 echo "[OK] Packages installed"
 
 
-echo "[2/7] Installing Filebeat..."apt-get update -qq 2>&1 | tail -5
-apt-get install -y --no-install-recommends \
-    iptables \
-    iproute2 \
-    iputils-ping \
-    net-tools \
-    ulogd2 \
-    ulogd2-json \
-    wget \
-    curl \
-    bash \
-    procps \
-    gnupg \
-    ca-certificates \
-    2>&1 | tail -10
+echo "[2/7] Installing Filebeat..."
 # Install Filebeat
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
 echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list
