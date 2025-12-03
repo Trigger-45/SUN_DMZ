@@ -714,6 +714,7 @@ topology:
         MODSEC_AUDIT_ENGINE: "On"
         MODSEC_AUDIT_LOG: "/var/log/audit/audit.log"
         MODSEC_AUDIT_LOG_TYPE: "Serial"
+        MODSEC_AUDIT_LOG_PARTS: "ABIFHZ"
         BACKEND: "http://10.0.2.10:5000"
         MODSEC_RULE_ENGINE: "On"
         PARANOIA: "2"
@@ -735,6 +736,7 @@ topology:
         ALLOWED_METHODS: "GET HEAD POST OPTIONS"
         ALLOWED_REQUEST_CONTENT_TYPE: "|application/x-www-form-urlencoded| |multipart/form-data| |multipart/related| |text/xml| |application/xml| |application/soap+xml| |application/json| |application/cloudevents+json| |application/cloudevents-batch+json|"
         ENFORCE_BODYPROC_URLENCODED: "1"
+        PROXY_SSL: "off"
       binds:
         - ./webserver-details/server.crt:/etc/nginx/conf/server.crt:rw
         - ./webserver-details/server.key:/etc/nginx/conf/server.key:rw
