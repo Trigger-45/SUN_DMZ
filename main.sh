@@ -93,7 +93,7 @@ log_info "Deploying topology..."
 bash "${SCRIPT_DIR}/scripts/setup/03-deploy-topology.sh"
 
 if [ "$TOPOLOGY_ONLY" = true ]; then
-    log_section "Topology-Only Deployment Complete!"
+    log_section "Topology-Only Deployment Compl<ete!"
     log_info "Containers are running without configuration"
     log_info "To configure components, run: $0 --full"
     log_info "To destroy the lab, run: $0 --destroy"

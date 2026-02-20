@@ -1,0 +1,47 @@
+all:
+  vars:
+    # The generated inventory is assumed to be used from the clab host.
+    # Hence no http proxy should be used. Therefore we make sure the http
+    # module does not attempt using any global http proxy.
+    ansible_httpapi_use_proxy: false
+  children:
+    linux:
+      hosts:
+        clab-MaJuVi-Admin_PC:
+          ansible_host: 172.20.20.7
+        clab-MaJuVi-Attacker:
+          ansible_host: 172.20.20.2
+        clab-MaJuVi-DMZ_Switch:
+          ansible_host: 172.20.20.10
+        clab-MaJuVi-Database:
+          ansible_host: 172.20.20.15
+        clab-MaJuVi-External_FW:
+          ansible_host: 172.20.20.6
+        clab-MaJuVi-Flask_Webserver:
+          ansible_host: 172.20.20.13
+        clab-MaJuVi-IDS:
+          ansible_host: 172.20.20.5
+        clab-MaJuVi-IDS2:
+          ansible_host: 172.20.20.19
+        clab-MaJuVi-Internal_Client1:
+          ansible_host: 172.20.20.20
+        clab-MaJuVi-Internal_Client2:
+          ansible_host: 172.20.20.4
+        clab-MaJuVi-Internal_FW:
+          ansible_host: 172.20.20.12
+        clab-MaJuVi-Internal_Switch:
+          ansible_host: 172.20.20.18
+        clab-MaJuVi-Proxy_WAF:
+          ansible_host: 172.20.20.11
+        clab-MaJuVi-SIEM_FW:
+          ansible_host: 172.20.20.9
+        clab-MaJuVi-elasticsearch:
+          ansible_host: 172.20.20.5
+        clab-MaJuVi-kibana:
+          ansible_host: 172.20.20.16
+        clab-MaJuVi-logstash:
+          ansible_host: 172.20.20.17
+        clab-MaJuVi-router-edge:
+          ansible_host: 172.20.20.14
+        clab-MaJuVi-router-internet:
+          ansible_host: 172.20.20.3

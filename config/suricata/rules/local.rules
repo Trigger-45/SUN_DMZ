@@ -1,0 +1,25 @@
+# SQL Injection Detection
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER SQL Injection Attempt - UNION SELECT"; flow:established,to_server; content:"UNION"; nocase; content:"SELECT"; nocase; classtype:web-application-attack; sid:1000001; rev:2;)
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER SQL Injection Attempt - OR 1=1"; flow:established,to_server; content:"OR"; nocase; content:"1=1"; nocase; classtype:web-application-attack; sid:1000002; rev:1;)
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER SQL Injection Attempt - admin comment"; flow:established,to_server; content:"admin"; nocase; content:"--"; classtype:web-application-attack; sid:1000003; rev:1;)
+
+# XSS Detection
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER XSS Attempt - script tag"; flow:established,to_server; content:"<script"; nocase; classtype:web-application-attack; sid:1000010; rev:1;)
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER XSS Attempt - img onerror"; flow:established,to_server; content:"<img"; nocase; content:"onerror"; nocase; classtype:web-application-attack; sid:1000011; rev:1;)
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER XSS Attempt - svg onload"; flow:established,to_server; content:"<svg"; nocase; content:"onload"; nocase; classtype:web-application-attack; sid:1000012; rev:1;)
+
+# Directory Traversal
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER Directory Traversal - etc/passwd"; flow:established,to_server; content:"etc/passwd"; nocase; classtype:web-application-attack; sid:1000020; rev:1;)
+alert http any any -> $HOME_NET $HTTP_PORTS (msg:"ET WEB_SERVER Directory Traversal - .. / pattern"; flow:established,to_server; content:"../"; classtype:web-application-attack; sid:1000021; rev:1;)
+
+# SSH Brute Force
+alert tcp any any -> $HOME_NET $SSH_PORTS (msg:"ET SCAN Potential SSH Brute Force"; flow:to_server; flags:S; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-dos; sid:1000030; rev:1;)
+
+# DoS Detection
+alert icmp any any -> $HOME_NET any (msg:"ET DOS ICMP Flood"; threshold:type both, track by_src, count 100, seconds 10; classtype:attempted-dos; sid:1000040; rev:1;)
+alert tcp any any -> $HOME_NET $HTTP_PORTS (msg:"ET DOS HTTP GET Flood"; flow:to_server; content:"GET"; http_method; threshold:type both, track by_src, count 100, seconds 10; classtype:attempted-dos; sid:1000041; rev:1;)
+alert tcp any any -> $HOME_NET $HTTP_PORTS (msg:"ET DOS HTTP POST Flood"; flow:to_server; content:"POST"; http_method; threshold:type both, track by_src, count 50, seconds 10; classtype:attempted-dos; sid:1000042; rev:1;)
+alert tcp any any -> $HOME_NET any (msg:"ET DOS SYN Flood"; flags:S; threshold:type both, track by_dst, count 100, seconds 10; classtype:attempted-dos; sid:1000043; rev:1;)
+
+# Port Scanning
+alert tcp any any -> $HOME_NET any (msg:"ET SCAN Potential Port Scan"; flags:S; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-recon; sid:1000050; rev:1;)

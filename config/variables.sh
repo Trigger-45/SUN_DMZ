@@ -74,10 +74,12 @@ export FILEBEAT_CONFIG="${SCRIPT_DIR}/config/filebeat.yml"
 export LOGSTASH_CONFIG="${SCRIPT_DIR}/config/logstash/pipeline.conf"
 
 # =========================
-# Logging
+# Directories
 # =========================
 export LOG_DIR="${SCRIPT_DIR}/logs"
-export LOG_FILE="${LOG_DIR}/deployment-$(date +%Y%m%d-%H%M%S).log"
+export TOPOLOGY_DIR="${SCRIPT_DIR}/topology"
+export CONFIG_DIR="${SCRIPT_DIR}/config"
 
-# Create log directory if it doesn't exist
-mkdir -p "${LOG_DIR}"
+# Create required directories
+mkdir -p "${LOG_DIR}" 2>/dev/null || true
+mkdir -p "${TOPOLOGY_DIR}" 2>/dev/null || true

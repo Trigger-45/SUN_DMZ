@@ -10,14 +10,22 @@ source "${SCRIPT_DIR}/config/variables.sh"
 
 log_section "SECTION 3: Deploying Containerlab Topology"
 
-# Generate topology file
-log_info "Generating topology file..."
+# Generate configuration files
+log_info "Generating configuration files..."
 bash "${SCRIPT_DIR}/topology/topology-generator.sh"
 
 # Deploy containerlab
 log_info "Deploying containerlab topology..."
 cd "${SCRIPT_DIR}"
-sudo containerlab deploy --reconfigure --topo "topology/${TOPO_FILE}"
+
+if [ -f "topology/${TOPO_FILE}" ]; then
+    sudo containerlab deploy --reconfigure --topo "topology/${TOPO_FILE}"
+elif [ -f "${TOPO_FILE}" ]; then
+    sudo containerlab deploy --reconfigure --topo "${TOPO_FILE}"
+else
+    log_error "Topology file not found!"
+    exit 1
+fi
 
 log_ok "Containerlab topology deployed successfully"
 
@@ -30,11 +38,11 @@ echo ""
 log_info "Total containers created: ${TOTAL_CONTAINERS}"
 log_info "Running containers: ${RUNNING_CONTAINERS}"
 
-if [ "$TOTAL_CONTAINERS" -eq "$RUNNING_CONTAINERS" ]; then
-    log_ok "All containers are running!"
+if [ "$TOTAL_CONTAINERS" -eq "$RUNNING_CONTAINERS" ] && [ "$TOTAL_CONTAINERS" -gt 0 ]; then
+    log_ok "All containers are running! ✓"
 else
-    log_warn "Some containers may not be running."
-    log_warn "Check with: sudo docker ps -a --filter 'name=clab-${LAB_NAME}'"
+    log_warn "Some containers may not be running"
+    log_info "Check with: sudo docker ps -a --filter 'name=clab-${LAB_NAME}'"
 fi
 
 echo ""
