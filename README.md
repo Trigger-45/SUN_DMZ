@@ -1,114 +1,70 @@
-# 🛡️ DMZ-Projekt – Sichere Webanwendungsumgebung mit Docker & Containerlab
+# SUN_DMZ - Enterprise Network Security Lab
 
-## 📘 Projektbeschreibung
-Dieses Projekt wurde im Rahmen der Prüfungsleistung **„Aufbau und Absicherung einer DMZ (Demilitarized Zone)“** entwickelt.  
-Ziel ist die Bereitstellung einer **sicheren, containerisierten Netzwerkumgebung** für eine unternehmenskritische Webanwendung nach dem Stand der Technik.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Linux-green.svg)
+![Containerlab](https://img.shields.io/badge/containerlab-0.48%2B-orange.svg)
+![Docker](https://img.shields.io/badge/docker-24.0%2B-blue.svg)
 
-Die gesamte DMZ wird automatisiert über ein **Bash-Skript** innerhalb einer **virtuellen Maschine (Debian + Docker + Containerlab)** aufgebaut.  
-Das Skript erstellt und konfiguriert alle Komponenten, vernetzt sie logisch, und führt grundlegende Funktionstests durch.
+A comprehensive, containerized enterprise network security lab environment featuring DMZ architecture, multiple firewalls, IDS/IPS systems, and a complete SIEM stack (Elasticsearch, Logstash, Kibana).
 
----
+## 📋 Table of Contents
 
----
-
-## 🗺️ Netzwerk-Topologie
-
-Die folgende Abbildung zeigt die logische Struktur der DMZ-Umgebung mit allen zentralen Komponenten und Netzwerkzonen:
-
-![DMZ Topologie](diagramm.png)
-
----
-
-## ⚙️ Systemübersicht
-
-### 🧩 Komponenten der DMZ
-| Komponente      | Beschreibung |
-|-----------------|---------------|
-| **Edge Router** | Verbindung zum Internet, Routing & NAT |
-| **Firewall**    | Paketfilterung, Zugriffskontrolle |
-| **Reverse Proxy** | Weiterleitung externer Anfragen an den internen Webserver |
-| **Web Application Firewall (WAF)** | Schutz vor OWASP Top 10 Angriffen |
-| **Intrusion Detection System (IDS)** | Angriffserkennung (z. B. Snort oder Suricata) |
-| **Webserver**   | Kritische Webanwendung (z. B. Nginx oder Apache) |
-| **SIEM-System** | Zentrale Protokollierung und Alarmierung |
-| **Client & Backend Netze** | Simulation interner und externer Benutzer |
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Detailed Usage](#detailed-usage)
+- [Network Topology](#network-topology)
+- [Components](#components)
+- [Attack Scenarios](#attack-scenarios)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🧱 Systemanforderungen
+## 🎯 Overview
 
-| Ressource | Empfehlung |
-|------------|-------------|
-| vCPU | 2 Kerne |
-| RAM | 2–4 GB |
-| Disk | ≥ 10 GB |
-| Betriebssystem | Debian (aktuell) |
-| Software | Docker, Containerlab, Bash |
+**SUN_DMZ** is an automated security lab deployment tool that creates a complete enterprise network environment using containerlab. It simulates a realistic corporate infrastructure with:
 
----
+- **Internal Network** (192.168.10.0/24)
+- **DMZ Network** (10.0.2.0/24)
+- **SIEM Network** (10.0.3.0/24)
+- **Internet/Edge** (200.168.1.0/24)
 
-## 🧪 Tests & Verifikation
-
-Nach erfolgreichem Aufbau können folgende Tests durchgeführt werden:
-
-| Test | Beschreibung |
-|------|---------------|
-| **Ping-Tests** | Erreichbarkeit zwischen den Netzsegmenten |
-| **Webzugriff** | Aufruf der Webanwendung über den Reverse Proxy |
-| **Firewall-Test** | Blockierung unerlaubter Ports/Protokolle |
-| **WAF-Test** | Simulation von OWASP-Top-10-Angriffen |
-| **IDS-Test** | Erkennung verdächtiger Aktivitäten |
-| **SIEM-Test** | Weiterleitung von Logmeldungen an das Backend |
-
-Alle Tests werden protokolliert und in `logs/` gespeichert.
-
----
----
-
-## 🧠 Sicherheit & Härtung
-
-- Minimaler Container Footprint (nur benötigte Dienste)
-- Konfiguration nach **„Least Privilege“-Prinzip**
-- Regelmäßige Updates und Paketüberprüfung
-- Netztrennung nach Zonenprinzip (Internet / DMZ / Backend)
-- Proaktive (Firewall, WAF) und reaktive Maßnahmen (IDS, SIEM)
-- Eigenentwickelte Angriffe zur Funktionsüberprüfung der Abwehrsysteme
+Perfect for:
+- Security training and education
+- Penetration testing practice
+- IDS/IPS rule development
+- SIEM log analysis
+- Network forensics
 
 ---
 
-## 📊 Nachweis der Funktionsfähigkeit
+## ✨ Features
 
-Die Funktionalität und Sicherheit der Umgebung wird durch:
-1. **Live-Demonstration** (Vorführung des Aufbaus und Tests)
-2. **Dokumentation** (technische Erläuterung, Sicherheitsanalyse)
-3. **Protokollierte Angriffstests** (externe & interne Szenarien)
-4. **SIEM-Alarmmeldungen**  
-nachgewiesen.
+### Network Security
+- **Multi-tier Firewall Architecture** (Internal, External, SIEM)
+- **IDS/IPS** with Suricata (DMZ + Internal)
+- **Web Application Firewall** (ModSecurity)
+- **Network Segmentation** with VLANs
 
----
+### Application Stack
+- **Vulnerable Web Application** (Flask + PostgreSQL)
+- **Reverse Proxy** with SSL/TLS
+- **Database Server** with sample data
 
-## 👩‍💻 Team
+### Security Monitoring
+- **SIEM Stack** (ELK: Elasticsearch 9.2.1, Logstash, Kibana)
+- **Centralized Logging** (Firewall + IDS logs)
+- **Real-time Alerting**
+- **Traffic Analysis**
 
-| Name | Rolle | Zuständigkeit |
-|------|--------|----------------|
-| Max Mustermann | Netzwerk & Firewall | Containerlab, Routing, Firewall |
-| Lisa Beispiel | Web & Proxy | Webserver, Reverse Proxy, WAF |
-| John Doe | Security & Monitoring | IDS, SIEM, Angriffssimulation |
-
----
-
-## 📚 Lizenz
-Dieses Projekt wurde ausschließlich zu **Lehr- und Prüfungszwecken** erstellt.  
-© 2025 – [Euer Teamname / Hochschule]
-
----
-
-## 🧩 Kontakt
-Bei Fragen oder technischen Problemen:  
-📧 team@dmz-projekt.local  
-🌐 https://github.com/<teamname>/dmz-projekt
-
-
-
-
+### Automation
+- **One-command Deployment**
+- **Modular Configuration**
+- **Automated Cleanup**
+- **Pre-configured Attack Scenarios**
 
