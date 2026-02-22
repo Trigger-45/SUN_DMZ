@@ -64,7 +64,7 @@ topology:
         - SYS_MODULE
         - NET_RAW
 
-    IDS2:
+    Internal_IDS:
       kind: linux
       image: ${IMG_SURICATA}
       group: ids
@@ -116,7 +116,7 @@ topology:
       cap-add:
         - NET_ADMIN
 
-    IDS:
+    DMZ_IDS:
       kind: linux
       image: ${IMG_SURICATA}
       group: ids
@@ -217,7 +217,7 @@ topology:
     - endpoints: ["Internal_Client1:eth1", "Internal_Switch:eth1"]
     - endpoints: ["Internal_Client2:eth1", "Internal_Switch:eth2"]
     - endpoints: ["Internal_Switch:eth3", "Internal_FW:eth1"]
-    - endpoints: ["Internal_Switch:eth4", "IDS2:eth1"]
+    - endpoints: ["Internal_Switch:eth4", "Internal_IDS:eth1"]
     
     # Internal FW to DMZ/External
     - endpoints: ["Internal_FW:eth2", "DMZ_Switch:eth1"]
@@ -227,14 +227,14 @@ topology:
     # DMZ Network
     - endpoints: ["DMZ_Switch:eth2", "External_FW:eth1"]
     - endpoints: ["DMZ_Switch:eth3", "Proxy_WAF:eth1"]
-    - endpoints: ["DMZ_Switch:eth4", "IDS:eth1"]
+    - endpoints: ["DMZ_Switch:eth4", "DMZ_IDS:eth1"]
     - endpoints: ["Proxy_WAF:eth2", "Flask_Webserver:eth1"]
     - endpoints: ["Proxy_WAF:eth3", "SIEM_FW:eth9"]
     - endpoints: ["Flask_Webserver:eth2", "Database:eth1"]
     
     # IDS to SIEM
-    - endpoints: ["IDS:eth2", "SIEM_FW:eth7"]
-    - endpoints: ["IDS2:eth2", "SIEM_FW:eth8"]
+    - endpoints: ["DMZ_IDS:eth2", "SIEM_FW:eth7"]
+    - endpoints: ["Internal_IDS:eth2", "SIEM_FW:eth8"]
     
     # External FW
     - endpoints: ["External_FW:eth2", "router-edge:eth2"]

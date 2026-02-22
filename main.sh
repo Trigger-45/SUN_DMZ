@@ -1,12 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get base directory
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Set up paths for different components
+export SCRIPTS_DIR="${BASE_DIR}/scripts"
+export CONFIG_DIR="${BASE_DIR}/config"
 
 # Load dependencies
-source "${SCRIPT_DIR}/scripts/lib/logging.sh"
-source "${SCRIPT_DIR}/config/variables.sh"
+source "${SCRIPTS_DIR}/lib/logging.sh"
+source "${CONFIG_DIR}/variables.sh"
 
 # =========================
 # Usage Information
@@ -67,9 +71,9 @@ done
 # =========================
 if [ "$DESTROY_MODE" = true ] || [ "$PURGE_MODE" = true ]; then
     if [ "$PURGE_MODE" = true ]; then
-        bash "${SCRIPT_DIR}/scripts/setup/01-cleanup.sh" --purge
+        bash "${SCRIPTS_DIR}/setup/01-cleanup.sh" --purge
     else
-        bash "${SCRIPT_DIR}/scripts/setup/01-cleanup.sh"
+        bash "${SCRIPTS_DIR}/setup/01-cleanup.sh"
     fi
     exit 0
 fi
@@ -81,16 +85,16 @@ log_section "Starting SUN_DMZ Deployment"
 
 if [ "$SKIP_CLEANUP" = false ]; then
     log_info "Running cleanup phase..."
-    bash "${SCRIPT_DIR}/scripts/setup/01-cleanup.sh"
+    bash "${SCRIPTS_DIR}/setup/01-cleanup.sh"
 else
     log_warn "Skipping cleanup phase"
 fi
 
 log_info "Preparing Docker environment..."
-bash "${SCRIPT_DIR}/scripts/setup/02-docker-prep.sh"
+bash "${SCRIPTS_DIR}/setup/02-docker-prep.sh"
 
 log_info "Deploying topology..."
-bash "${SCRIPT_DIR}/scripts/setup/03-deploy-topology.sh"
+bash "${SCRIPTS_DIR}/setup/03-deploy-topology.sh"
 
 if [ "$TOPOLOGY_ONLY" = true ]; then
     log_section "Topology-Only Deployment Compl<ete!"
@@ -105,35 +109,51 @@ fi
 # =========================
 if [ "$FULL_DEPLOY" = true ]; then
     log_section "Starting Configuration Phase"
+
+
+    log_subsection "Waiting for Elasticsearch to be ready"
+    log_info "Waiting for Elasticsearch to be ready (this may take a couple of minutes)..."
+    until sudo docker exec clab-MaJuVi-elasticsearch curl -s http://localhost:9200/_cluster/health | grep -q '"status":"green"'; do
+    sudo docker exec clab-MaJuVi-elasticsearch curl -s http://localhost:9200/_cluster/health || true
+    sleep 2
+    done
+
+    echo ""
+    log_ok "Elasticsearch cluster reports green"
+
+    log_info "Configuring firewalls..."
+    bash "${SCRIPTS_DIR}/configure/firewalls/internal-fw.sh"
+    bash "${SCRIPTS_DIR}/configure/firewalls/external-fw.sh"
+    bash "${SCRIPTS_DIR}/configure/firewalls/siem-fw.sh"
+    bash "${SCRIPTS_DIR}/configure/firewalls/waf.sh"
+
+    # log_info "Configuring IDS..."
+    # bash "${SCRIPTS_DIR}/configure/ids/ids-dmz.sh"
+    # bash "${SCRIPTS_DIR}/configure/ids/ids-internal.sh"
+
+    log_info "Configuring clients..."
+    bash "${SCRIPTS_DIR}/configure/clients/internal-clients.sh"
+    bash "${SCRIPTS_DIR}/configure/clients/attacker.sh"
+    
     
     log_info "Configuring network components..."
-    bash "${SCRIPT_DIR}/scripts/configure/network/switches.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/network/router-edge.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/network/router-internet.sh"
+    bash "${SCRIPTS_DIR}/configure/network/switches.sh"
+    bash "${SCRIPTS_DIR}/configure/network/router-edge.sh"
+    bash "${SCRIPTS_DIR}/configure/network/router-internet.sh"
     
-    log_info "Configuring firewalls..."
-    bash "${SCRIPT_DIR}/scripts/configure/firewalls/internal-fw.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/firewalls/external-fw.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/firewalls/siem-fw.sh"
     
     log_info "Configuring DMZ services..."
-    bash "${SCRIPT_DIR}/scripts/configure/dmz/database.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/dmz/webserver.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/dmz/proxy-waf.sh"
+    bash "${SCRIPTS_DIR}/configure/dmz/database.sh"
+    bash "${SCRIPTS_DIR}/configure/dmz/webserver.sh"
+    bash "${SCRIPTS_DIR}/configure/dmz/proxy.sh"
     
-    log_info "Configuring IDS..."
-    bash "${SCRIPT_DIR}/scripts/configure/ids/ids-dmz.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/ids/ids-internal.sh"
     
     log_info "Configuring SIEM stack..."
-    bash "${SCRIPT_DIR}/scripts/configure/siem/elasticsearch.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/siem/logstash.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/siem/kibana.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/siem/siem-pc.sh"
-    
-    log_info "Configuring clients..."
-    bash "${SCRIPT_DIR}/scripts/configure/clients/internal-clients.sh"
-    bash "${SCRIPT_DIR}/scripts/configure/clients/attacker.sh"
+    bash "${SCRIPTS_DIR}/configure/siem/elasticsearch.sh"
+    bash "${SCRIPTS_DIR}/configure/siem/logstash.sh"
+    bash "${SCRIPTS_DIR}/configure/siem/kibana.sh"
+    bash "${SCRIPTS_DIR}/configure/siem/siem-pc.sh"
+
     
     log_section "Full Deployment Complete!"
 fi
@@ -144,7 +164,7 @@ fi
 echo ""
 log_ok "Deployment finished successfully!"
 log_info "View topology: sudo containerlab inspect --topo topology/${TOPO_FILE}"
-log_info "Run tests: bash ${SCRIPT_DIR}/scripts/tests/test-connectivity.sh"
+log_info "Run tests: bash ${SCRIPTS_DIR}/tests/test-connectivity.sh"
 log_info "Destroy lab: $0 --destroy"
 log_info "Purge all (including images): $0 --purge"
 echo ""
