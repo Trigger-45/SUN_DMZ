@@ -1,0 +1,1094 @@
+{
+  "name": "MaJuVi",
+  "type": "clab",
+  "clab": {
+    "config": {
+      "prefix": "clab",
+      "mgmt": {
+        "network": "mgmt-net",
+        "bridge": "br-48ee2502c4b7",
+        "ipv4-subnet": "172.20.20.0/24",
+        "ipv4-gw": "172.20.20.1",
+        "external-access": true
+      }
+    }
+  },
+  "ssh-pub-keys": [],
+  "nodes": {
+    "Attacker": {
+      "index": "0",
+      "shortname": "Attacker",
+      "longname": "clab-MaJuVi-Attacker",
+      "fqdn": "Attacker.MaJuVi.io",
+      "group": "server",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Attacker",
+      "kind": "linux",
+      "image": "kalilinux/kali-rolling",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.8",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "server",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Attacker",
+        "clab-node-longname": "clab-MaJuVi-Attacker",
+        "clab-node-name": "Attacker",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "DMZ_IDS": {
+      "index": "1",
+      "shortname": "DMZ_IDS",
+      "longname": "clab-MaJuVi-DMZ_IDS",
+      "fqdn": "DMZ_IDS.MaJuVi.io",
+      "group": "ids",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/DMZ_IDS",
+      "kind": "linux",
+      "image": "jasonish/suricata:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.4",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "ids",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/DMZ_IDS",
+        "clab-node-longname": "clab-MaJuVi-DMZ_IDS",
+        "clab-node-name": "DMZ_IDS",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "DMZ_Switch": {
+      "index": "2",
+      "shortname": "DMZ_Switch",
+      "longname": "clab-MaJuVi-DMZ_Switch",
+      "fqdn": "DMZ_Switch.MaJuVi.io",
+      "group": "switch",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/DMZ_Switch",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.11",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "switch",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/DMZ_Switch",
+        "clab-node-longname": "clab-MaJuVi-DMZ_Switch",
+        "clab-node-name": "DMZ_Switch",
+        "clab-node-type": "bridge",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "Database": {
+      "index": "3",
+      "shortname": "Database",
+      "longname": "clab-MaJuVi-Database",
+      "fqdn": "Database.MaJuVi.io",
+      "group": "server",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Database",
+      "kind": "linux",
+      "image": "postgres:16",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.10",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "server",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Database",
+        "clab-node-longname": "clab-MaJuVi-Database",
+        "clab-node-name": "Database",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "0.0.0.0",
+          "host-port": 3636,
+          "port": 5432,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "::",
+          "host-port": 3636,
+          "port": 5432,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "External_FW": {
+      "index": "4",
+      "shortname": "External_FW",
+      "longname": "clab-MaJuVi-External_FW",
+      "fqdn": "External_FW.MaJuVi.io",
+      "group": "firewall",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/External_FW",
+      "kind": "linux",
+      "image": "debian:bookworm-slim",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.20",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "firewall",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/External_FW",
+        "clab-node-longname": "clab-MaJuVi-External_FW",
+        "clab-node-name": "External_FW",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "Flask_Webserver": {
+      "index": "5",
+      "shortname": "Flask_Webserver",
+      "longname": "clab-MaJuVi-Flask_Webserver",
+      "fqdn": "Flask_Webserver.MaJuVi.io",
+      "group": "server",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Flask_Webserver",
+      "kind": "linux",
+      "image": "nginx:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.2",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "server",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Flask_Webserver",
+        "clab-node-longname": "clab-MaJuVi-Flask_Webserver",
+        "clab-node-name": "Flask_Webserver",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 80,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "0.0.0.0",
+          "host-port": 5000,
+          "port": 5000,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "::",
+          "host-port": 5000,
+          "port": 5000,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "Internal_Client1": {
+      "index": "6",
+      "shortname": "Internal_Client1",
+      "longname": "clab-MaJuVi-Internal_Client1",
+      "fqdn": "Internal_Client1.MaJuVi.io",
+      "group": "server",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_Client1",
+      "kind": "linux",
+      "image": "alpine:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.7",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "server",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_Client1",
+        "clab-node-longname": "clab-MaJuVi-Internal_Client1",
+        "clab-node-name": "Internal_Client1",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "Internal_Client2": {
+      "index": "7",
+      "shortname": "Internal_Client2",
+      "longname": "clab-MaJuVi-Internal_Client2",
+      "fqdn": "Internal_Client2.MaJuVi.io",
+      "group": "server",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_Client2",
+      "kind": "linux",
+      "image": "alpine:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.5",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "server",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_Client2",
+        "clab-node-longname": "clab-MaJuVi-Internal_Client2",
+        "clab-node-name": "Internal_Client2",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "Internal_FW": {
+      "index": "8",
+      "shortname": "Internal_FW",
+      "longname": "clab-MaJuVi-Internal_FW",
+      "fqdn": "Internal_FW.MaJuVi.io",
+      "group": "firewall",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_FW",
+      "kind": "linux",
+      "image": "ubuntu:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.13",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "firewall",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_FW",
+        "clab-node-longname": "clab-MaJuVi-Internal_FW",
+        "clab-node-name": "Internal_FW",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "Internal_IDS": {
+      "index": "9",
+      "shortname": "Internal_IDS",
+      "longname": "clab-MaJuVi-Internal_IDS",
+      "fqdn": "Internal_IDS.MaJuVi.io",
+      "group": "ids",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_IDS",
+      "kind": "linux",
+      "image": "jasonish/suricata:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.5",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "ids",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_IDS",
+        "clab-node-longname": "clab-MaJuVi-Internal_IDS",
+        "clab-node-name": "Internal_IDS",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "Internal_Switch": {
+      "index": "10",
+      "shortname": "Internal_Switch",
+      "longname": "clab-MaJuVi-Internal_Switch",
+      "fqdn": "Internal_Switch.MaJuVi.io",
+      "group": "switch",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_Switch",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.12",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "switch",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Internal_Switch",
+        "clab-node-longname": "clab-MaJuVi-Internal_Switch",
+        "clab-node-name": "Internal_Switch",
+        "clab-node-type": "bridge",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "Proxy_WAF": {
+      "index": "11",
+      "shortname": "Proxy_WAF",
+      "longname": "clab-MaJuVi-Proxy_WAF",
+      "fqdn": "Proxy_WAF.MaJuVi.io",
+      "group": "firewall",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Proxy_WAF",
+      "kind": "linux",
+      "image": "owasp/modsecurity-crs:nginx",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.19",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "firewall",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/Proxy_WAF",
+        "clab-node-longname": "clab-MaJuVi-Proxy_WAF",
+        "clab-node-name": "Proxy_WAF",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "0.0.0.0",
+          "host-port": 8181,
+          "port": 8080,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "::",
+          "host-port": 8181,
+          "port": 8080,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "SIEM_FW": {
+      "index": "12",
+      "shortname": "SIEM_FW",
+      "longname": "clab-MaJuVi-SIEM_FW",
+      "fqdn": "SIEM_FW.MaJuVi.io",
+      "group": "firewall",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/SIEM_FW",
+      "kind": "linux",
+      "image": "debian:bookworm-slim",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.18",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "firewall",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/SIEM_FW",
+        "clab-node-longname": "clab-MaJuVi-SIEM_FW",
+        "clab-node-name": "SIEM_FW",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "elasticsearch": {
+      "index": "13",
+      "shortname": "elasticsearch",
+      "longname": "clab-MaJuVi-elasticsearch",
+      "fqdn": "elasticsearch.MaJuVi.io",
+      "group": "siem",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/elasticsearch",
+      "kind": "linux",
+      "image": "docker.elastic.co/elasticsearch/elasticsearch:9.2.1",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.3",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "siem",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/elasticsearch",
+        "clab-node-longname": "clab-MaJuVi-elasticsearch",
+        "clab-node-name": "elasticsearch",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "0.0.0.0",
+          "host-port": 9200,
+          "port": 9200,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "::",
+          "host-port": 9200,
+          "port": 9200,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 9300,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "kibana": {
+      "index": "14",
+      "shortname": "kibana",
+      "longname": "clab-MaJuVi-kibana",
+      "fqdn": "kibana.MaJuVi.io",
+      "group": "siem",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/kibana",
+      "kind": "linux",
+      "image": "docker.elastic.co/kibana/kibana:9.2.1",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.9",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "siem",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/kibana",
+        "clab-node-longname": "clab-MaJuVi-kibana",
+        "clab-node-name": "kibana",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "0.0.0.0",
+          "host-port": 5601,
+          "port": 5601,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "::",
+          "host-port": 5601,
+          "port": 5601,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "logstash": {
+      "index": "15",
+      "shortname": "logstash",
+      "longname": "clab-MaJuVi-logstash",
+      "fqdn": "logstash.MaJuVi.io",
+      "group": "siem",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/logstash",
+      "kind": "linux",
+      "image": "docker.elastic.co/logstash/logstash:9.2.1",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.14",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "siem",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/logstash",
+        "clab-node-longname": "clab-MaJuVi-logstash",
+        "clab-node-name": "logstash",
+        "clab-node-type": "",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 5044,
+          "protocol": "tcp"
+        },
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 9600,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "router-edge": {
+      "index": "16",
+      "shortname": "router-edge",
+      "longname": "clab-MaJuVi-router-edge",
+      "fqdn": "router-edge.MaJuVi.io",
+      "group": "router",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/router-edge",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.6",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "router",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/router-edge",
+        "clab-node-longname": "clab-MaJuVi-router-edge",
+        "clab-node-name": "router-edge",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "router-internet": {
+      "index": "17",
+      "shortname": "router-internet",
+      "longname": "clab-MaJuVi-router-internet",
+      "fqdn": "router-internet.MaJuVi.io",
+      "group": "router",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/router-internet",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.15",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "router",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/router-internet",
+        "clab-node-longname": "clab-MaJuVi-router-internet",
+        "clab-node-name": "router-internet",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    },
+    "siem_pc": {
+      "index": "18",
+      "shortname": "siem_pc",
+      "longname": "clab-MaJuVi-siem_pc",
+      "fqdn": "siem_pc.MaJuVi.io",
+      "group": "server",
+      "labdir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/siem_pc",
+      "kind": "linux",
+      "image": "alpine:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.16",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-48ee2502c4b7",
+        "clab-node-group": "server",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/clab-MaJuVi/siem_pc",
+        "clab-node-longname": "clab-MaJuVi-siem_pc",
+        "clab-node-name": "siem_pc",
+        "clab-node-type": "host",
+        "clab-owner": "turtle",
+        "clab-topo-file": "/home/turtle/SUN_DMZ/SUN_DMZ/topology/DMZ.yml",
+        "containerlab": "MaJuVi"
+      },
+      "port-bindings": [
+      ]
+    }
+  },
+  "links": [
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_Client1",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:f6:f9:81",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Internal_Switch",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:2a:4e:6c",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_Client2",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:da:83:ca",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Internal_Switch",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:f1:e3:a6",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_Switch",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:ac:cd:bb",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Internal_FW",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:a1:53:f8",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_Switch",
+          "interface": "eth4",
+          "mac": "aa:c1:ab:d5:fb:5e",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Internal_IDS",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:31:46:37",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_FW",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:43:7b:f2",
+          "peer": "z"
+        },
+        "z": {
+          "node": "DMZ_Switch",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:5f:be:31",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_FW",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:25:fe:2e",
+          "peer": "z"
+        },
+        "z": {
+          "node": "External_FW",
+          "interface": "eth4",
+          "mac": "aa:c1:ab:53:58:f4",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_FW",
+          "interface": "eth4",
+          "mac": "aa:c1:ab:df:f3:6e",
+          "peer": "z"
+        },
+        "z": {
+          "node": "SIEM_FW",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:96:79:a8",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "DMZ_Switch",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:80:ee:ca",
+          "peer": "z"
+        },
+        "z": {
+          "node": "External_FW",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:59:1e:b6",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "DMZ_Switch",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:d3:28:0e",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Proxy_WAF",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:40:f0:b5",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "DMZ_Switch",
+          "interface": "eth4",
+          "mac": "aa:c1:ab:69:06:7e",
+          "peer": "z"
+        },
+        "z": {
+          "node": "DMZ_IDS",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:49:b3:e0",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Proxy_WAF",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:cd:f2:82",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Flask_Webserver",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:76:49:3f",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Proxy_WAF",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:f8:66:d9",
+          "peer": "z"
+        },
+        "z": {
+          "node": "SIEM_FW",
+          "interface": "eth9",
+          "mac": "aa:c1:ab:a6:7c:eb",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Flask_Webserver",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:d5:88:d8",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Database",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:3b:e5:1c",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "DMZ_IDS",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:ba:27:68",
+          "peer": "z"
+        },
+        "z": {
+          "node": "SIEM_FW",
+          "interface": "eth7",
+          "mac": "aa:c1:ab:48:40:84",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "Internal_IDS",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:b1:e0:2f",
+          "peer": "z"
+        },
+        "z": {
+          "node": "SIEM_FW",
+          "interface": "eth8",
+          "mac": "aa:c1:ab:25:dd:15",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "External_FW",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:40:8b:67",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router-edge",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:aa:79:fa",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "External_FW",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:8f:32:96",
+          "peer": "z"
+        },
+        "z": {
+          "node": "SIEM_FW",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:4f:49:cf",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "SIEM_FW",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:2c:a1:40",
+          "peer": "z"
+        },
+        "z": {
+          "node": "logstash",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:06:0d:af",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "SIEM_FW",
+          "interface": "eth4",
+          "mac": "aa:c1:ab:1f:6b:9c",
+          "peer": "z"
+        },
+        "z": {
+          "node": "elasticsearch",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:0e:8d:a7",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "SIEM_FW",
+          "interface": "eth5",
+          "mac": "aa:c1:ab:08:aa:7f",
+          "peer": "z"
+        },
+        "z": {
+          "node": "kibana",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:bf:e9:e2",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "SIEM_FW",
+          "interface": "eth6",
+          "mac": "aa:c1:ab:b0:c8:6f",
+          "peer": "z"
+        },
+        "z": {
+          "node": "siem_pc",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:a2:e8:d5",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "logstash",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:b0:9a:c3",
+          "peer": "z"
+        },
+        "z": {
+          "node": "elasticsearch",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:fc:cf:3f",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "elasticsearch",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:aa:d7:5b",
+          "peer": "z"
+        },
+        "z": {
+          "node": "kibana",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:0c:28:e6",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router-edge",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:24:0a:61",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router-internet",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:be:1c:17",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router-internet",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:ca:ff:38",
+          "peer": "z"
+        },
+        "z": {
+          "node": "Attacker",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:c6:87:eb",
+          "peer": "a"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+---
+Attacker:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.8
+DMZ_IDS:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.4
+DMZ_Switch:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.11
+Database:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.10
+External_FW:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.20
+Flask_Webserver:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.2
+Internal_Client1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.7
+Internal_Client2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.5
+Internal_FW:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.13
+Internal_IDS:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.5
+Internal_Switch:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.12
+Proxy_WAF:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.19
+SIEM_FW:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.18
+elasticsearch:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.3
+kibana:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.9
+logstash:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.14
+router-edge:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.6
+router-internet:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.15
+siem_pc:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.16

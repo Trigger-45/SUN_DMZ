@@ -109,16 +109,17 @@ export SIEM_FW_ETH9_IP="10.0.3.33/30"
 # SIEM Systems
 # ==================================================
 export SIEM_LOGSTASH_ETH1_IP="10.0.3.10/30"
-export SIEM_LOGSTASH_GW="10.0.3.9"
+export SIEM_LOGSTASH_ETH2_IP="10.0.3.25/30"
 
 export SIEM_ELASTIC_ETH1_IP="10.0.3.26/30"
+export SIEM_ELASTIC_ETH2_IP="10.0.3.29/30"
+export SIEM_ELASTIC_ETH3_IP="10.0.3.14/30"
 export SIEM_ELASTIC_GW="10.0.3.25"
 
 export SIEM_KIBANA_ETH1_IP="10.0.3.30/30"
-export SIEM_KIBANA_GW="10.0.3.29"
+export SIEM_KIBANA_ETH2_IP="10.0.3.18/30"
 
-export SIEM_ADMIN_ETH1_IP="10.0.3.22/30"
-export SIEM_ADMIN_GW="10.0.3.21"
+export SIEM_PC_ETH1_IP="10.0.3.22/30"
 
 # ==================================================
 # Internet & Edge

@@ -124,7 +124,6 @@ if [ "$FULL_DEPLOY" = true ]; then
     log_info "Configuring firewalls..."
     bash "${SCRIPTS_DIR}/configure/firewalls/internal-fw.sh"
     bash "${SCRIPTS_DIR}/configure/firewalls/external-fw.sh"
-    bash "${SCRIPTS_DIR}/configure/firewalls/siem-fw.sh"
     bash "${SCRIPTS_DIR}/configure/firewalls/waf.sh"
 
     # log_info "Configuring IDS..."
@@ -153,6 +152,8 @@ if [ "$FULL_DEPLOY" = true ]; then
     bash "${SCRIPTS_DIR}/configure/siem/logstash.sh"
     bash "${SCRIPTS_DIR}/configure/siem/kibana.sh"
     bash "${SCRIPTS_DIR}/configure/siem/siem-pc.sh"
+
+    bash "${SCRIPTS_DIR}/configure/firewalls/siem-fw.sh"
 
     
     log_section "Full Deployment Complete!"
