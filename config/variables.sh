@@ -71,7 +71,6 @@ export EXT_FW_NAT_IP="172.168.3.5"
 export DMZ_WAF_ETH1_IP="10.0.2.30/24"
 export DMZ_WAF_ETH2_IP="10.0.2.60/24"
 export DMZ_WAF_ETH3_IP="10.0.3.34/30"
-export DMZ_WAF_GW="10.0.3.33"
 
 # Webserver
 export DMZ_WEB_ETH1_IP="10.0.2.10/24"

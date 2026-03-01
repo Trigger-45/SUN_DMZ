@@ -15,26 +15,26 @@ log_info "Configuring External Firewall"
 EXTERNAL_FW_CONTAINER="clab-${LAB_NAME}-External_FW"
 
 
-# sudo docker exec -i \
-#     -e EXT_FW_ETH1_IP="${EXT_FW_ETH1_IP}" \
-#     -e EXT_FW_ETH2_IP="${EXT_FW_ETH2_IP}" \
-#     -e EXT_FW_ETH3_IP="${EXT_FW_ETH3_IP}" \
-#     -e EXT_FW_ETH4_IP="${EXT_FW_ETH4_IP}" \
-#     -e SIEM_LOGSTASH_ETH1_IP="${SIEM_LOGSTASH_ETH1_IP}" \
-# 	-e ROUTER_EDGE_ETH2_IP="${ROUTER_EDGE_ETH2_IP}" \
-# 	-e INT_FW_ETH3_IP="${INT_FW_ETH3_IP}" \
-# 	-e SUBNET_EDGE_1="${SUBNET_EDGE_1}" \
-# 	-e SUBNET_INTERNAL="${SUBNET_INTERNAL}" \
-# 	-e SUBNET_BACKEND="${SUBNET_BACKEND}" \
-# 	-e SUBNET_INTERNET="${SUBNET_INTERNET}" \
-# 	-e SUBNET_DMZ="${SUBNET_DMZ}" \
-# 	-e SUBNET_BETWEEN_FW="${SUBNET_BETWEEN_FW}" \
-# 	-e DMZ_WAF_ETH1_IP="${DMZ_WAF_ETH1_IP}" \
-#     -e EXT_FW_NAT_IP="${EXT_FW_NAT_IP}" \
-#     "${EXTERNAL_FW_CONTAINER}" bash << 'EOF'
-# set -e
+sudo docker exec -i \
+    -e EXT_FW_ETH1_IP="${EXT_FW_ETH1_IP}" \
+    -e EXT_FW_ETH2_IP="${EXT_FW_ETH2_IP}" \
+    -e EXT_FW_ETH3_IP="${EXT_FW_ETH3_IP}" \
+    -e EXT_FW_ETH4_IP="${EXT_FW_ETH4_IP}" \
+    -e SIEM_LOGSTASH_ETH1_IP="${SIEM_LOGSTASH_ETH1_IP}" \
+	-e ROUTER_EDGE_ETH2_IP="${ROUTER_EDGE_ETH2_IP}" \
+	-e INT_FW_ETH3_IP="${INT_FW_ETH3_IP}" \
+	-e SUBNET_EDGE_1="${SUBNET_EDGE_1}" \
+	-e SUBNET_INTERNAL="${SUBNET_INTERNAL}" \
+	-e SUBNET_BACKEND="${SUBNET_BACKEND}" \
+	-e SUBNET_INTERNET="${SUBNET_INTERNET}" \
+	-e SUBNET_DMZ="${SUBNET_DMZ}" \
+	-e SUBNET_BETWEEN_FW="${SUBNET_BETWEEN_FW}" \
+	-e DMZ_WAF_ETH1_IP="${DMZ_WAF_ETH1_IP}" \
+    -e EXT_FW_NAT_IP="${EXT_FW_NAT_IP}" \
+	-e SIEM_FW_ETH2_IP="${SIEM_FW_ETH2_IP}" \
+    "${EXTERNAL_FW_CONTAINER}" bash << 'EOF'
 
-sudo docker exec -i "${EXTERNAL_FW_CONTAINER}" bash <<EOF
+
 set -e
 
 # ============================================
@@ -143,16 +143,16 @@ fi
 cat > /etc/filebeat/filebeat.yml << 'FILEBEAT_CONFIG'
 filebeat.inputs:
 - type: log
-	enabled: true
-	paths:
-		- /var/log/firewall/firewall-events.log
-	fields:
-		firewall: external
-		log_type: firewall
-	fields_under_root: true
+  enabled: true
+  paths:
+    - /var/log/firewall/firewall-events.log
+  fields:
+    firewall: external
+    log_type: firewall
+  fields_under_root: true
 
 output.logstash:
-	hosts: ["${SIEM_LOGSTASH_ETH1_IP%/*}:5044"]
+  hosts: ["10.0.3.10:5044"]
 
 path.data: /var/lib/filebeat
 logging.level: info
@@ -182,8 +182,8 @@ iptables -P OUTPUT ACCEPT
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/sec -j ACCEPT
-iptables -A INPUT -p tcp --dport 22 -s ${SUBNET_DMZ} -j ACCEPT
-iptables -A INPUT -p tcp --dport 22 -s ${SUBNET_BETWEEN_FW} -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -s "${SUBNET_DMZ}" -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -s "${SUBNET_BETWEEN_FW}" -j ACCEPT
 
 iptables -A INPUT -m limit --limit 1000/min --limit-burst 2000 -j NFLOG \
 	--nflog-prefix "[EXT-FW-INPUT-DROP] " --nflog-group 0
@@ -211,55 +211,55 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 # ============================================
 
 # Per-IP rate limiting: max 20 new connections per minute
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
 	-m conntrack --ctstate NEW \
 	-m recent --name webserver_dos --set
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
 	-m conntrack --ctstate NEW \
 	-m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-DOS-BLOCK] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
 	-m conntrack --ctstate NEW \
 	-m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
 	-j DROP
 
 # Global rate limit: 50 connections/sec per source
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
 	-m conntrack --ctstate NEW \
 	-m limit --limit 50/sec --limit-burst 100 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-ACCEPT] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
 	-m conntrack --ctstate NEW \
 	-m limit --limit 50/sec --limit-burst 100 \
 	-j ACCEPT
 
 # Anything over limit gets dropped
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
 	-m limit --limit 1000/min --limit-burst 2000 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-RATELIMIT-DROP] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p tcp --dport 8443 -j DROP
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 -j DROP
 
 # ============================================
 # Internet → Webserver (ICMP) with rate limiting
 # ============================================
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p icmp --icmp-type echo-request \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p icmp --icmp-type echo-request \
 	-m limit --limit 10/sec --limit-burst 20 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-ICMP-ACCEPT] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p icmp --icmp-type echo-request \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p icmp --icmp-type echo-request \
 	-m limit --limit 10/sec --limit-burst 20 \
 	-j ACCEPT
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p icmp --icmp-type echo-request \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p icmp --icmp-type echo-request \
 	-m limit --limit 1000/min --limit-burst 2000 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-ICMP-DROP] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d ${DMZ_WAF_ETH1_IP%/*} -p icmp --icmp-type echo-request -j DROP
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p icmp --icmp-type echo-request -j DROP
 
 # ============================================
 # SYN Flood Protection
@@ -279,10 +279,10 @@ iptables -A FORWARD -i eth2 -p tcp --syn -j DROP
 # ============================================
 
 # Block Interior network pings from internet
-iptables -A FORWARD -i eth2 -o eth1 -d ${SUBNET_INTERNAL} -p icmp \
+iptables -A FORWARD -i eth2 -o eth1 -d "${SUBNET_INTERNAL}" -p icmp \
 	-m limit --limit 1000/min --limit-burst 2000 -j NFLOG \
 	--nflog-prefix "[EXT-FW-INTERN-ICMP-DROP] " --nflog-group 0
-iptables -A FORWARD -i eth2 -o eth1 -d ${SUBNET_INTERNAL} -p icmp -j DROP
+iptables -A FORWARD -i eth2 -o eth1 -d "${SUBNET_INTERNAL}" -p icmp -j DROP
 
 # DMZ → Internet
 iptables -A FORWARD -i eth1 -o eth2 -m conntrack --ctstate NEW \
@@ -318,154 +318,26 @@ iptables -A FORWARD -j DROP
 # ============================================
 
 # ICMP DNAT
-iptables -t nat -A PREROUTING -i eth2 -d ${EXT_FW_NAT_IP} -p icmp --icmp-type echo-request -j DNAT --to-destination ${DMZ_WAF_ETH1_IP%/*}
+iptables -t nat -A PREROUTING -i eth2 -d "${EXT_FW_NAT_IP}" -p icmp --icmp-type echo-request -j DNAT --to-destination ${DMZ_WAF_ETH1_IP%/*}
 
 # HTTPS DNAT
-iptables -t nat -A PREROUTING -i eth2 -d ${EXT_FW_NAT_IP} -p tcp --dport 8443 -j DNAT --to-destination ${DMZ_WAF_ETH1_IP%/*}:8443
+iptables -t nat -A PREROUTING -i eth2 -d "${EXT_FW_NAT_IP}" -p tcp --dport 8443 -j DNAT --to-destination ${DMZ_WAF_ETH1_IP%/*}:8443
 
 # SNAT for responses
-iptables -t nat -A POSTROUTING -o eth2 -s ${DMZ_WAF_ETH1_IP%/*} -j SNAT --to-source ${EXT_FW_NAT_IP}
-iptables -t nat -A POSTROUTING -o eth2 -s ${SUBNET_INTERNAL} -j MASQUERADE
-iptables -t nat -A POSTROUTING -o eth2 -s ${SUBNET_DMZ} -j MASQUERADE
-iptables -t nat -A POSTROUTING -o eth2 -s ${SUBNET_BETWEEN_FW} -j MASQUERADE
+iptables -t nat -A POSTROUTING -o eth2 -s "${DMZ_WAF_ETH1_IP%/*}" -j SNAT --to-source ${EXT_FW_NAT_IP}
+iptables -t nat -A POSTROUTING -o eth2 -s "${SUBNET_INTERNAL}" -j MASQUERADE
+iptables -t nat -A POSTROUTING -o eth2 -s "${SUBNET_DMZ}" -j MASQUERADE
+iptables -t nat -A POSTROUTING -o eth2 -s "${SUBNET_BETWEEN_FW}" -j MASQUERADE
 
 echo "[OK] iptables rules and NAT configured"
 
 # Routing
-ip route replace ${SUBNET_EDGE_1} via ${ROUTER_EDGE_ETH2_IP%/*} dev eth2 2>/dev/null || true
-ip route replace ${SUBNET_INTERNAL} via ${INT_FW_ETH3_IP%/*} dev eth4 2>/dev/null || true
-ip route add ${SUBNET_BACKEND} via ${SIEM_FW_ETH2_IP%/*} dev eth3 || true
-ip route add ${SUBNET_INTERNET} via ${ROUTER_EDGE_ETH2_IP%/*} dev eth2 || true
+ip route replace "${SUBNET_EDGE_1}" via "${ROUTER_EDGE_ETH2_IP%/*}" dev eth2 2>/dev/null || true
+ip route replace "${SUBNET_INTERNAL}" via "${INT_FW_ETH3_IP%/*}" dev eth4 2>/dev/null || true
+ip route add "${SUBNET_BACKEND}" via "${SIEM_FW_ETH2_IP%/*}" dev eth3 2>/dev/null || true
+ip route add "${SUBNET_INTERNET}" via "${ROUTER_EDGE_ETH2_IP%/*}" dev eth2 2>/dev/null || true
 
 echo "[OK] Routing configured"
-
-# Create helper scripts
-echo "[7/7] Creating helper scripts..."
-
-cat > /usr/local/bin/fw-stats << 'STATS_SCRIPT'
-#!/bin/bash
-echo "=========================================="
-echo "External Firewall Statistics"
-echo "=========================================="
-echo ""
-echo "Logging Method: NFLOG + ulogd2"
-echo "iptables: \$(iptables --version)"
-echo ""
-
-if pgrep -x ulogd >/dev/null; then
-	echo "ulogd2 Status:   RUNNING (PID: \$(pgrep -x ulogd))"
-else
-	echo "ulogd2 Status:   NOT RUNNING"
-fi
-echo ""
-
-echo "--- Last 20 Firewall Events ---"
-if [ -f /var/log/firewall/firewall-events.log ] && [ -s /var/log/firewall/firewall-events.log ]; then
-	tail -20 /var/log/firewall/firewall-events.log
-else
-	LOG_SIZE=\$(stat -c%s /var/log/firewall/firewall-events.log 2>/dev/null || echo "0")
-	echo "No events logged yet (Log size: \$LOG_SIZE bytes)"
-fi
-
-echo ""
-echo "--- Event Summary ---"
-if [ -f /var/log/firewall/firewall-events.log ] && [ -s /var/log/firewall/firewall-events.log ]; then
-	TOTAL=\$(wc -l < /var/log/firewall/firewall-events.log)
-	echo "Total events: \$TOTAL"
-	echo ""
-	echo "Events by type:"
-	grep -o 'EXT-FW-[A-Z-]*' /var/log/firewall/firewall-events.log 2>/dev/null | sort | uniq -c | sort -rn || true
-fi
-
-echo ""
-echo "--- iptables Rule Counters ---"
-iptables -L -v -n | grep -E "Chain|NFLOG|pkts" | head -30
-
-echo ""
-echo "--- NAT Rules ---"
-iptables -t nat -L -v -n | grep -E "Chain|MASQUERADE|DNAT|SNAT" | head -20
-
-echo ""
-echo "=========================================="
-STATS_SCRIPT
-
-cat > /usr/local/bin/fw-logs-live << 'LIVE_SCRIPT'
-#!/bin/bash
-echo "=== Live External Firewall Logs (NFLOG) ==="
-echo "Press CTRL+C to stop"
-echo ""
-
-if [ -f /var/log/firewall/firewall-events.log ]; then
-	tail -f /var/log/firewall/firewall-events.log
-else
-	echo "ERROR: Log file not found"
-	exit 1
-fi
-LIVE_SCRIPT
-
-cat > /usr/local/bin/fw-search << 'SEARCH_SCRIPT'
-#!/bin/bash
-if [ -z "\$1" ]; then
-	echo "Usage: fw-search <search_term>"
-	echo "Example: fw-search '${DMZ_WAF_ETH1_IP%/*}'"
-	echo "Example: fw-search 'INET-TO-DMZ'"
-	exit 1
-fi
-
-echo "Searching for: \$1"
-echo ""
-
-if [ -f /var/log/firewall/firewall-events.log ]; then
-	grep -i "\$1" /var/log/firewall/firewall-events.log || echo "No matches found"
-else
-	echo "ERROR: Log file not found"
-	exit 1
-fi
-SEARCH_SCRIPT
-
-chmod +x /usr/local/bin/fw-stats
-chmod +x /usr/local/bin/fw-logs-live
-chmod +x /usr/local/bin/fw-search
-
-echo "[OK] Helper scripts created"
-
-# Final verification
-echo ""
-echo "=========================================="
-echo "  External Firewall Configuration Complete"
-echo "=========================================="
-echo ""
-echo "Logging: NFLOG + ulogd2"
-echo "Log file: /var/log/firewall/firewall-events.log"
-echo ""
-echo "Helper Commands:"
-echo "  fw-stats      - Show statistics and recent events"
-echo "  fw-logs-live  - View live logs"
-echo "  fw-search     - Search logs"
-echo ""
-echo "Testing..."
-
-sleep 3
-
-if [ -f /var/log/firewall/firewall-events.log ]; then
-	SIZE=\$(stat -c%s /var/log/firewall/firewall-events.log 2>/dev/null || echo "0")
-	echo "Log file size: \$SIZE bytes"
-	
-	if [ "\$SIZE" -gt "0" ]; then
-		echo "Logging is working! Latest entries:"
-		tail -5 /var/log/firewall/firewall-events.log
-	else
-		echo "Log file exists but is empty (normal if no traffic matched rules yet)"
-		echo ""
-		echo "Verification:"
-		echo "  - ulogd2: \$(pgrep -x ulogd >/dev/null && echo 'RUNNING  ' || echo 'NOT RUNNING  ')"
-		echo "  - NFLOG rules: \$(iptables -L -v -n | grep -c NFLOG) configured"
-	fi
-else
-	echo "WARNING: Log file not created!"
-fi
-
-echo ""
 echo "=========================================="
 
 EOF

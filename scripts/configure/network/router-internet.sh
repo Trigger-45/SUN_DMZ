@@ -21,6 +21,8 @@ sudo docker exec -i \
     -e SUBNET_INTERNAL="${SUBNET_INTERNAL}" \
     -e SUBNET_INTERNET="${SUBNET_INTERNET}" \
     -e SUBNET_EDGE_2="${SUBNET_EDGE_2}" \
+    -e ROUTER_EDGE_ETH1_IP="${ROUTER_EDGE_ETH1_IP}" \
+    -e ROUTER_EDGE_ETH2_IP="${ROUTER_EDGE_ETH2_IP}" \
     "${ROUTER_INTERNET_CONTAINER}" sh << 'EOF'
 set -e
 # ensure tooling
@@ -32,8 +34,8 @@ elif command -v apk >/dev/null 2>&1; then
 fi
 
 # Interfaces: eth1 <-> Attacker, eth2 <-> router-edge
-ip addr add ${ROUTER_INTERNET_ETH1_IP} dev eth1 || true
-ip addr add ${ROUTER_INTERNET_ETH2_IP} dev eth2 || true
+ip addr add "${ROUTER_INTERNET_ETH1_IP}" dev eth1 || true
+ip addr add "${ROUTER_INTERNET_ETH2_IP}" dev eth2 || true
 
 ip link set eth1 up
 ip link set eth2 up
@@ -47,9 +49,9 @@ iptables -P INPUT ACCEPT
 iptables -P OUTPUT ACCEPT
 
 
-ip route add ${SUBNET_INTERNAL} via ${ROUTER_EDGE_ETH1_IP%/*} || true
-ip route add ${SUBNET_INTERNET} dev eth1 || true
-ip route add ${SUBNET_EDGE_2} via ${ROUTER_EDGE_ETH2_IP%/*} dev eth2 || true
+ip route add "${SUBNET_INTERNAL}" via "${ROUTER_EDGE_ETH1_IP%/*}" || true
+ip route add "${SUBNET_INTERNET}" dev eth1 || true
+ip route add "${SUBNET_EDGE_2}" via "${ROUTER_EDGE_ETH2_IP%/*}" dev eth2 || true
 EOF
 
 log_ok "router-internet configured"

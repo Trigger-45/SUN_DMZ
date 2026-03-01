@@ -91,10 +91,8 @@ topology:
 
     Flask_Webserver:
       kind: linux
-      image: ${IMG_NGINX}
+      image: ${IMG_UBUNTU}
       group: server
-      ports:
-        - "5000:5000"
       cap-add:
         - NET_ADMIN
 
@@ -116,6 +114,8 @@ topology:
         POSTGRES_USER: admin_user
         POSTGRES_PASSWORD: securePassword123
         POSTGRES_DB: mydatabase
+      binds:
+        - ${SCRIPT_DIR}/config/db-init/init-users.sql:/docker-entrypoint-initdb.d/init-users.sql:ro
       ports:
         - "3636:5432"
       cap-add:

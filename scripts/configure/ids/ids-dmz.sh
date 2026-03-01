@@ -55,7 +55,7 @@ filebeat.inputs:
   fields_under_root: true
 
 output.logstash:
-  hosts: ["${SIEM_LOGSTASH_ETH1_IP%/*}:5044"]
+  hosts: ["10.0.3.10:5044"]
 
 path.data: /var/lib/filebeat
 logging.level: warning

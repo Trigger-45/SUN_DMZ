@@ -98,8 +98,8 @@ run_test "External_FW running" \
 run_test "SIEM_FW running" \
     "sudo docker ps --filter 'name=clab-MaJuVi-SIEM_FW' --format '{{.Names}}' | grep -q 'SIEM_FW'" 5
 
-run_test "Web_Proxy_WAF running" \
-    "sudo docker ps --filter 'name=clab-MaJuVi-Web_Proxy_WAF' --format '{{.Names}}' | grep -q 'Web_Proxy_WAF'" 5
+run_test "Proxy_WAF running" \
+    "sudo docker ps --filter 'name=clab-MaJuVi-Proxy_WAF' --format '{{.Names}}' | grep -q 'Proxy_WAF'" 5
 
 run_test "Database running" \
     "sudo docker ps --filter 'name=clab-MaJuVi-Database' --format '{{.Names}}' | grep -q 'Database'" 5
@@ -145,7 +145,8 @@ run_test "Webserver → Database" \
     "sudo docker exec clab-MaJuVi-Flask_Webserver ping -c 2 -W 2 10.0.2.70 >/dev/null 2>&1" 8
 
 run_test "Proxy → Database" \
-    "sudo docker exec clab-MaJuVi-Web_Proxy_WAF ping -c 2 -W 2 10.0.2.10 >/dev/null 2>&1" 8
+    "sudo docker exec clab-MaJuVi-Proxy_WAF ping -c 2 -W 2 10.0.2.10 >/dev/null 2>&1" 8
+    
 run_test "Attacker → Internet Router" \
     "sudo docker exec clab-MaJuVi-Attacker ping -c 2 -W 2 200.168.1.1 >/dev/null 2>&1" 8
 
@@ -169,7 +170,7 @@ run_test "Internet → Webserver Port 80 (ALLOW)" \
     "sudo docker exec clab-MaJuVi-Attacker curl -s -m 5 http://172.168.3.5 2>/dev/null | grep -q 'Login'" 8
 
 run_test "DMZ → Internal BLOCKED" \
-    "!  sudo docker exec clab-MaJuVi-Web_Proxy_WAF timeout 3 ping -c 1 -W 2 192.168.10.10 >/dev/null 2>&1" 8
+    "!  sudo docker exec clab-MaJuVi-Proxy_WAF timeout 3 ping -c 1 -W 2 192.168.10.10 >/dev/null 2>&1" 8
 
 run_test "Internet → Internal BLOCKED" \
     "! sudo docker exec clab-MaJuVi-Attacker timeout 3 ping -c 1 -W 2 192.168.10.10 >/dev/null 2>&1" 8
@@ -244,7 +245,7 @@ echo -e "${BOLD}${MAGENTA}═══ SECTION 6: Security Tests ═══${ENDCOLO
 echo ""
 
 run_test "WAF/ModSecurity active" \
-    "sudo docker exec clab-MaJuVi-Web_Proxy_WAF nginx -V 2>&1 | grep -q 'modsecurity'" 5
+    "sudo docker exec clab-MaJuVi-Proxy_WAF nginx -V 2>&1 | grep -q 'modsecurity'" 5
 
 run_test "IP Forwarding enabled (Firewalls)" \
     "sudo docker exec clab-MaJuVi-Internal_FW cat /proc/sys/net/ipv4/ip_forward | grep -q '1'" 5
