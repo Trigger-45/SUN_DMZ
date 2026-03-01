@@ -24,6 +24,7 @@ sudo docker exec -u 0 -i \
 	-e SUBNET_BACKEND="${SUBNET_BACKEND}" \
 	-e SUBNET_INTERNET="${SUBNET_INTERNET}" \
 	-e EXT_FW_NAT_IP="${EXT_FW_NAT_IP}" \
+	-e SIEM_FW_ETH9_IP="${SIEM_FW_ETH9_IP}" \
     "${WAF_CONTAINER}" bash << 'EOF'
 set -e
 
@@ -100,7 +101,7 @@ filebeat.inputs:
   fields_under_root: true
 
 output.logstash:
-  hosts: ["${SIEM_LOGSTASH_ETH1_IP%/*}:5044"]
+  hosts: ["10.0.3.10:5044"]
 
 path.data: /var/lib/filebeat
 logging.level: warning
@@ -118,9 +119,9 @@ echo "[OK] Filebeat configured and started"
 # Configure network interfaces
 # ============================================
 echo "[Configuring network interfaces..."
-ip addr add ${DMZ_WAF_ETH3_IP} dev eth3 || true
+ip addr add "${DMZ_WAF_ETH3_IP}" dev eth3 || true
 ip link set eth3 up
-ip route add ${SUBNET_BACKEND} via ${DMZ_WAF_GW%/*} dev eth3 || true
+ip route add "${SUBNET_BACKEND}" via "${SIEM_FW_ETH9_IP%/*}" dev eth3 || true
 
 echo "[OK] Network interfaces configured"
 

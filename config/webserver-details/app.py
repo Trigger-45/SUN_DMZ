@@ -6,10 +6,10 @@ app = Flask(__name__)
 app.secret_key = "your-secret-key"  # needed for session management
 
 # DB connection details - use environment variables or defaults
-DB_HOST = os.getenv('DB_HOST', '10.0.2.10')
+DB_HOST = os.getenv('DB_HOST', '10.0.2.70')
 DB_NAME = os.getenv('DB_NAME', 'mydatabase')
-DB_USER = os.getenv('DB_USER', 'admin_use')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'strongpassword')
+DB_USER = os.getenv('DB_USER', 'admin_user')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'securePassword123')
 DB_PORT = 5432
 
 def get_db_connection():

@@ -27,6 +27,7 @@ sudo docker exec -i \
     -e SUBNET_EDGE_2="${SUBNET_EDGE_2}" \
     -e SUBNET_BACKEND="${SUBNET_BACKEND}" \
     -e EXT_FW_ETH4_IP="${EXT_FW_ETH4_IP}" \
+	-e SIEM_FW_ETH1_IP="${SIEM_FW_ETH1_IP}" \
     "${INTERNAL_FW_CONTAINER}" bash <<'EOF'
 set -e
 
@@ -145,7 +146,7 @@ filebeat.inputs:
   fields_under_root: true
 
 output.logstash:
-  hosts: ["${SIEM_LOGSTASH_ETH1_IP%/*}:5044"]
+  hosts: ["10.0.3.10:5044"]
 
 path.data: /var/lib/filebeat
 logging.level: info

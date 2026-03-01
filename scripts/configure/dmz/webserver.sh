@@ -44,13 +44,13 @@ echo "[OK] Dependencies installed"
 #start webserver on port 5000
 cd /app && python3 app.py &
 
-ip addr add ${DMZ_WEB_ETH1_IP} dev eth1 || true
-ip addr add ${DMZ_WEB_ETH2_IP} dev eth2 || true
+ip addr add "${DMZ_WEB_ETH1_IP}" dev eth1 || true
+ip addr add "${DMZ_WEB_ETH2_IP}" dev eth2 || true
 ip link set eth1 up
 ip link set eth2 up
 
-ip route replace default via ${DMZ_WAF_ETH2_IP%/*} || true
-ip route add ${DMZ_DB_ETH1_IP%/*} via ${DMZ_WEB_ETH2_IP%/*} dev eth2 || true
+ip route replace default via "${DMZ_WAF_ETH2_IP%/*}" || true
+ip route add "${DMZ_DB_ETH1_IP%/*}" via "${DMZ_WEB_ETH2_IP%/*}" dev eth2 || true
 
 EOF
 echo "[OK] Flask Webserver started"
