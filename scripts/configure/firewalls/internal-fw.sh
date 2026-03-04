@@ -194,11 +194,11 @@ iptables -A FORWARD -m conntrack --ctstate INVALID -j LOG_INVALID
 # Established/Related
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# Internal -> DMZ: Allow HTTPS (port 8443) to Webserver
-iptables -A FORWARD -i eth1 -o eth2 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
-	--nflog-prefix "[INT-FW-INTERN-TO-WEB-8443] " \
+# Internal -> DMZ: Allow HTTP (port 8080) to Proxy/Webserver
+iptables -A FORWARD -i eth1 -o eth2 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 -m conntrack --ctstate NEW -m limit --limit 10/min -j NFLOG \
+	--nflog-prefix "[INT-FW-INTERN-TO-WEB-8080] " \
 	--nflog-group 0
-iptables -A FORWARD -i eth1 -o eth2 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -i eth1 -o eth2 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 -m conntrack --ctstate NEW -j ACCEPT
 
 # Internal -> DMZ: Allow ICMP (ping) to Webserver
 iptables -A FORWARD -i eth1 -o eth2 -d "${DMZ_WAF_ETH1_IP%/*}" -p icmp --icmp-type echo-request -m limit --limit 10/min -j NFLOG \

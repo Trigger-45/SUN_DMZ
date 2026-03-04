@@ -101,10 +101,38 @@ topology:
       image: ${IMG_MODSECURITY}
       group: firewall
       ports:
-        - "8181:8080"
+        - "8080:8080"
+      env:
+        MODSEC_AUDIT_ENGINE: "On"
+        MODSEC_AUDIT_LOG: "/var/log/audit/audit.log"
+        MODSEC_AUDIT_LOG_TYPE: "Serial"
+        MODSEC_AUDIT_LOG_PARTS: "ABIFHZ"
+        BACKEND: "http://10.0.2.10:5000"
+        MODSEC_RULE_ENGINE: "On"
+        PARANOIA: "2"
+        ANOMALY_INBOUND: "5"
+        ANOMALY_OUTBOUND: "4"
+        BLOCKING_PARANOIA: "2"
+        EXECUTING_PARANOIA: "2"
+        DETECTION_PARANOIA: "2"
+        MODSEC_RESP_BODY_ACCESS: "On"
+        MODSEC_REQ_BODY_ACCESS: "On"
+        MAX_FILE_SIZE: "10485760"
+        MAX_NUM_ARGS: "300"
+        ARG_NAME_LENGTH: "256"
+        ARG_LENGTH: "4000"
+        TOTAL_ARG_LENGTH: "64000"
+        COMBINED_FILE_SIZES: "52428800"
+        RESTRICTED_EXTENSIONS: ".asa/ .asax/ .ascx/ .backup/ .bak/ .bat/ .cdx/ .cer/ .cfg/ .cmd/ .com/ .config/ .conf/ .cs/ .csproj/ .csr/ .dat/ .db/ .dbf/ .dll/ .dos/ .htr/ .htw/ .ida/ .idc/ .idq/ .inc/ .ini/ .key/ .licx/ .lnk/ .log/ .mdb/ .old/ .pass/ .pdb/ .pol/ .printer/ .pwd/ .rdb/ .resources/ .resx/ .sql/ .swp/ .sys/ .vb/ .vbs/ .vbproj/ .vsdisco/ .webinfo/ .xsd/ .xsx/"
+        RESTRICTED_HEADERS: "/proxy/ /lock-token/ /content-range/ /if/"
+        ALLOWED_METHODS: "GET HEAD POST OPTIONS"
+        ALLOWED_REQUEST_CONTENT_TYPE: "|application/x-www-form-urlencoded| |multipart/form-data| |multipart/related| |text/xml| |application/xml| |application/soap+xml| |application/json| |application/cloudevents+json| |application/cloudevents-batch+json|"
+        ENFORCE_BODYPROC_URLENCODED: "1"
+      binds:
+        - ${SCRIPT_DIR}/config/webserver-details/server.crt:/etc/nginx/conf/server.crt:rw
+        - ${SCRIPT_DIR}/config/webserver-details/server.key:/etc/nginx/conf/server.key:rw
       cap-add:
         - NET_ADMIN
-        - NET_RAW
 
     Database:
       kind: linux
@@ -174,11 +202,14 @@ topology:
       kind: linux
       image: ${IMG_LOGSTASH}
       group: siem
+      binds:
+        - ${SCRIPT_DIR}/config/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:rw
+        - ${SCRIPT_DIR}/config/logstash/pipeline:/usr/share/logstash/pipeline:rw
       env:
         XPACK_MONITORING_ENABLED: "false"
+        LS_JAVA_OPTS: "-Xmx512m -Xms512m"
       cap-add:
         - NET_ADMIN
-
     kibana:
       kind: linux
       image: ${IMG_KIBANA}

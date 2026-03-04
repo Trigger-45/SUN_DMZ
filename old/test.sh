@@ -164,10 +164,10 @@ echo -e "${BOLD}${MAGENTA}═══ SECTION 3: Firewall Rule Tests ═══${EN
 echo ""
 
 run_test "Internal → Webserver Port 80 (ALLOW)" \
-    "sudo docker exec clab-MaJuVi-Internal_Client1 curl -s -m 5 http://10.0.2.30 2>/dev/null | grep -q 'Login'" 8
+    "sudo docker exec clab-MaJuVi-Internal_Client1 curl -s -m 5 http://10.0.2.30:8080 2>/dev/null | grep -q 'Login'" 8
 
 run_test "Internet → Webserver Port 80 (ALLOW)" \
-    "sudo docker exec clab-MaJuVi-Attacker curl -s -m 5 http://172.168.3.5 2>/dev/null | grep -q 'Login'" 8
+    "sudo docker exec clab-MaJuVi-Attacker curl -s -m 5 http://172.168.3.5:8080 2>/dev/null | grep -q 'Login'" 8
 
 run_test "DMZ → Internal BLOCKED" \
     "!  sudo docker exec clab-MaJuVi-Proxy_WAF timeout 3 ping -c 1 -W 2 192.168.10.10 >/dev/null 2>&1" 8
