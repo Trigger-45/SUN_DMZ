@@ -321,7 +321,7 @@ iptables -A FORWARD -j DROP
 iptables -t nat -A PREROUTING -i eth2 -d "${EXT_FW_NAT_IP}" -p icmp --icmp-type echo-request -j DNAT --to-destination ${DMZ_WAF_ETH1_IP%/*}
 
 # HTTPS DNAT
-iptables -t nat -A PREROUTING -i eth2 -d "${EXT_FW_NAT_IP}" -p tcp --dport 8443 -j DNAT --to-destination ${DMZ_WAF_ETH1_IP%/*}:8443
+iptables -t nat -A PREROUTING -i eth2 -d "${EXT_FW_NAT_IP}" -p tcp --dport 8443 -j DNAT --to-destination ${DMZ_WAF_ETH1_IP%/*}:8080
 
 # SNAT for responses
 iptables -t nat -A POSTROUTING -o eth2 -s "${DMZ_WAF_ETH1_IP%/*}" -j SNAT --to-source ${EXT_FW_NAT_IP}

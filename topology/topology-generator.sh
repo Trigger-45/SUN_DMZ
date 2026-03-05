@@ -204,7 +204,7 @@ topology:
       group: siem
       binds:
         - ${SCRIPT_DIR}/config/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:rw
-        - ${SCRIPT_DIR}/config/logstash/pipeline:/usr/share/logstash/pipeline:rw
+        - ${SCRIPT_DIR}/config/logstash/pipeline/unified.conf:/usr/share/logstash/pipeline/unified.conf:rw
       env:
         XPACK_MONITORING_ENABLED: "false"
         LS_JAVA_OPTS: "-Xmx512m -Xms512m"
@@ -215,7 +215,7 @@ topology:
       image: ${IMG_KIBANA}
       group: siem
       env:
-        ELASTICSEARCH_HOSTS: "http://10.0.3.26:9200"
+        ELASTICSEARCH_HOSTS: "http://10.0.3.29:9200"
       ports:
         - "5601:5601"
       cap-add:

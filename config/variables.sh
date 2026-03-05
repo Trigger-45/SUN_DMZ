@@ -40,6 +40,7 @@ export SUBNET_BACKEND="10.0.3.0/30"
 export SUBNET_INTERNET="200.168.1.0/24"
 export SUBNET_EDGE_1="172.168.2.0/30"
 export SUBNET_EDGE_2="172.168.3.0/30"
+export SUBNET_NAT="172.168.3.0/24"
 
 # ==================================================
 # Internal Network

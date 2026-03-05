@@ -23,6 +23,8 @@ sudo docker exec -i \
     -e SUBNET_EDGE_2="${SUBNET_EDGE_2}" \
     -e ROUTER_EDGE_ETH1_IP="${ROUTER_EDGE_ETH1_IP}" \
     -e ROUTER_EDGE_ETH2_IP="${ROUTER_EDGE_ETH2_IP}" \
+    -e EXT_FW_NAT_IP="${EXT_FW_NAT_IP}" \
+    -e SUBNET_NAT="${SUBNET_NAT}" \
     "${ROUTER_INTERNET_CONTAINER}" sh << 'EOF'
 set -e
 # ensure tooling
@@ -51,7 +53,8 @@ iptables -P OUTPUT ACCEPT
 
 ip route add "${SUBNET_INTERNAL}" via "${ROUTER_EDGE_ETH1_IP%/*}" || true
 ip route add "${SUBNET_INTERNET}" dev eth1 || true
-ip route add "${SUBNET_EDGE_2}" via "${ROUTER_EDGE_ETH2_IP%/*}" dev eth2 || true
+ip route add "${EXT_FW_NAT_IP}" via "${ROUTER_EDGE_ETH1_IP%/*}" dev eth2 || true
+ip route add "${SUBNET_NAT}" via "${ROUTER_EDGE_ETH1_IP%/*}" dev eth2 || true
 EOF
 
 log_ok "router-internet configured"

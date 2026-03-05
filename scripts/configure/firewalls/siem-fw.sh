@@ -111,6 +111,7 @@ iptables -A FORWARD -s "${SIEM_PC_ETH1_IP%/*}" -d "${SIEM_ELASTIC_ETH1_IP%/*}" -
 
 # 3.  Firewall-Filebeats → Logstash (Port 5044)
 iptables -A FORWARD -s "${INT_FW_ETH4_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s "${INT_FW_ETH4_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p icmp -m conntrack --ctstate NEW -j ACCEPT
 iptables -A FORWARD -s "${EXT_FW_ETH3_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
 
 # 4.  Logstash → Elasticsearch (Port 9200)

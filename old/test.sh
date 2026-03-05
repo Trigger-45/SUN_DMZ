@@ -129,32 +129,32 @@ echo ""
 echo -e "${BOLD}${MAGENTA}═══ SECTION 2: Network Connectivity Tests ═══${ENDCOLOR}"
 echo ""
 
-run_test "Internal_Client1 → Internal_FW" \
+run_test "Internal_Client1 -> Internal_FW" \
     "sudo docker exec clab-MaJuVi-Internal_Client1 ping -c 2 -W 2 192.168.10.1 >/dev/null 2>&1" 8
 
-run_test "Internal_Client1 → internet" \
+run_test "Internal_Client1 -> internet" \
     "sudo docker exec clab-MaJuVi-Internal_Client1 ping -c 2 -W 2 internet >/dev/null 2>&1" 8
 
-run_test "Internal_Client1 → Webserver" \
+run_test "Internal_Client1 -> Webserver" \
     "sudo docker exec clab-MaJuVi-Internal_Client1 ping -c 2 -W 2 10.0.2.30 >/dev/null 2>&1" 8
 
-run_test "Internal_Client2 → Webserver" \
+run_test "Internal_Client2 -> Webserver" \
     "sudo docker exec clab-MaJuVi-Internal_Client2 ping -c 2 -W 2 10.0.2.30 >/dev/null 2>&1" 8
 
-run_test "Webserver → Database" \
+run_test "Webserver -> Database" \
     "sudo docker exec clab-MaJuVi-Flask_Webserver ping -c 2 -W 2 10.0.2.70 >/dev/null 2>&1" 8
 
-run_test "Proxy → Database" \
+run_test "Proxy -> Database" \
     "sudo docker exec clab-MaJuVi-Proxy_WAF ping -c 2 -W 2 10.0.2.10 >/dev/null 2>&1" 8
     
-run_test "Attacker → Internet Router" \
+run_test "Attacker -> Internet Router" \
     "sudo docker exec clab-MaJuVi-Attacker ping -c 2 -W 2 200.168.1.1 >/dev/null 2>&1" 8
 
-run_test "Admin_PC → Kibana (HTTP)" \
-    "sudo docker exec clab-MaJuVi-Admin_PC timeout 5 curl -s http://10.0.3.18:5601/api/status 2>/dev/null | grep -q 'name'" 10
+run_test "siem_pc -> Kibana (HTTP)" \
+    "sudo docker exec clab-MaJuVi-siem_pc timeout 5 curl -s http://10.0.3.18:5601/api/status 2>/dev/null | grep -q 'name'" 10
 
-run_test "Admin_PC → Elasticsearch (HTTP)" \
-    "sudo docker exec clab-MaJuVi-Admin_PC timeout 5 curl -s http://10.0.3.14:9200 2>/dev/null | grep -q 'tagline'" 10
+run_test "siem_pc -> Elasticsearch (HTTP)" \
+    "sudo docker exec clab-MaJuVi-siem_pc timeout 5 curl -s http://10.0.3.14:9200 2>/dev/null | grep -q 'tagline'" 10
 
 # =========================
 # SECTION 3: Firewall Rule Tests
@@ -163,19 +163,19 @@ echo ""
 echo -e "${BOLD}${MAGENTA}═══ SECTION 3: Firewall Rule Tests ═══${ENDCOLOR}"
 echo ""
 
-run_test "Internal → Webserver Port 80 (ALLOW)" \
+run_test "Internal Client -> Firewall -> Webserver Port 8080 (ALLOW)" \
     "sudo docker exec clab-MaJuVi-Internal_Client1 curl -s -m 5 http://10.0.2.30:8080 2>/dev/null | grep -q 'Login'" 8
 
-run_test "Internet → Webserver Port 80 (ALLOW)" \
-    "sudo docker exec clab-MaJuVi-Attacker curl -s -m 5 http://172.168.3.5:8080 2>/dev/null | grep -q 'Login'" 8
+run_test "Internet -> Firewall (NAT 8443) -> Webserver Port 8080 (ALLOW)" \
+    "sudo docker exec clab-MaJuVi-Attacker curl -s -m 5 http://172.168.3.5:8443 2>/dev/null | grep -q 'Login'" 8
 
-run_test "DMZ → Internal BLOCKED" \
+run_test "DMZ -> Internal BLOCKED" \
     "!  sudo docker exec clab-MaJuVi-Proxy_WAF timeout 3 ping -c 1 -W 2 192.168.10.10 >/dev/null 2>&1" 8
 
-run_test "Internet → Internal BLOCKED" \
+run_test "Internet -> Internal BLOCKED" \
     "! sudo docker exec clab-MaJuVi-Attacker timeout 3 ping -c 1 -W 2 192.168.10.10 >/dev/null 2>&1" 8
 
-run_test "Internal → Internet (ALLOW)" \
+run_test "Internal -> Internet (ALLOW)" \
     "sudo docker exec clab-MaJuVi-Internal_Client1 ping -c 2 -W 3 172.168.2.1 >/dev/null 2>&1" 10
 
 run_test "NAT Configuration (External FW)" \
@@ -189,7 +189,7 @@ echo -e "${BOLD}${MAGENTA}═══ SECTION 4: Service Tests ═══${ENDCOLOR
 echo ""
 
 run_test "Webserver HTTP responding" \
-    "curl -s -m 5 http://localhost:8181 2>/dev/null | grep -q 'Login'" 8
+    "curl -s -m 5 http://localhost:8080 2>/dev/null | grep -q 'Login'" 8
 
 run_test "Database PostgreSQL responding" \
     "sudo docker exec clab-MaJuVi-Database pg_isready -U admin_use >/dev/null 2>&1" 5
@@ -234,7 +234,7 @@ run_test "Suricata running (DMZ IDS)" \
 run_test "Suricata running (Internal IDS)" \
     "sudo docker exec clab-MaJuVi-Internal_IDS pgrep -x Suricata-Main >/dev/null 2>&1" 5
 
-run_test "Logstash → Elasticsearch connection" \
+run_test "Logstash -> Elasticsearch connection" \
     "sudo docker exec clab-MaJuVi-logstash timeout 5 sh -c 'curl -s http://10.0.3.26:9200 >/dev/null 2>&1'" 8
 
 # =========================
@@ -244,8 +244,8 @@ echo ""
 echo -e "${BOLD}${MAGENTA}═══ SECTION 6: Security Tests ═══${ENDCOLOR}"
 echo ""
 
-run_test "WAF/ModSecurity active" \
-    "sudo docker exec clab-MaJuVi-Proxy_WAF nginx -V 2>&1 | grep -q 'modsecurity'" 5
+run_test "WAF blocks SQLi test (403)" \
+    "sudo docker exec clab-MaJuVi-Proxy_WAF sh -c 'curl -s -o /dev/null -w \"%{http_code}\" \"http://127.0.0.1:8080/?id=1%27%20or%20%271%27=%271\" | grep -q \"^403$\"'" 8
 
 run_test "IP Forwarding enabled (Firewalls)" \
     "sudo docker exec clab-MaJuVi-Internal_FW cat /proc/sys/net/ipv4/ip_forward | grep -q '1'" 5
