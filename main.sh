@@ -137,7 +137,7 @@ if [ "$FULL_DEPLOY" = true ]; then
 
     log_info "Configuring clients..."
     bash "${SCRIPTS_DIR}/configure/clients/internal-clients.sh"
-    bash "${SCRIPTS_DIR}/configure/clients/attacker.sh"
+    # bash "${SCRIPTS_DIR}/configure/clients/attacker.sh"
     
     
     log_info "Configuring network components..."
@@ -153,8 +153,8 @@ if [ "$FULL_DEPLOY" = true ]; then
     
     
     log_info "Configuring SIEM stack..."
-    bash "${SCRIPTS_DIR}/configure/siem/elasticsearch.sh"
     bash "${SCRIPTS_DIR}/configure/siem/logstash.sh"
+    bash "${SCRIPTS_DIR}/configure/siem/elasticsearch.sh"
     bash "${SCRIPTS_DIR}/configure/siem/kibana.sh"
     bash "${SCRIPTS_DIR}/configure/siem/siem-pc.sh"
 

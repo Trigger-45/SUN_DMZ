@@ -192,7 +192,7 @@ topology:
       env:
         discovery.type: single-node
         xpack.security.enabled: "false"
-        ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        ES_JAVA_OPTS: "-Xms1g -Xmx1g"
       ports:
         - "9200:9200"
       cap-add:
@@ -204,10 +204,10 @@ topology:
       group: siem
       binds:
         - ${SCRIPT_DIR}/config/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:rw
-        - ${SCRIPT_DIR}/config/logstash/pipeline/unified.conf:/usr/share/logstash/pipeline/unified.conf:rw
+        - ${SCRIPT_DIR}/config/logstash/pipeline:/usr/share/logstash/pipeline:rw
       env:
         XPACK_MONITORING_ENABLED: "false"
-        LS_JAVA_OPTS: "-Xmx512m -Xms512m"
+        LS_JAVA_OPTS: "-Xmx1g -Xms1g"
       cap-add:
         - NET_ADMIN
     kibana:
@@ -215,7 +215,12 @@ topology:
       image: ${IMG_KIBANA}
       group: siem
       env:
-        ELASTICSEARCH_HOSTS: "http://10.0.3.29:9200"
+        ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+        SERVER_NAME: "kibana"
+        XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: "a7e4c9f2b8d3e1a6c5f8b2d9e4a7c1f3"
+        XPACK_REPORTING_ENCRYPTIONKEY: "b8f3d2e9a1c7f4e6d3b9a2c8f1e5d7a4"
+        XPACK_SECURITY_ENCRYPTIONKEY: "c1f8e3d7a9b4f2e6c8d1a5f9e2b7c4d3"
+        TELEMETRY_OPTIN: "false"
       ports:
         - "5601:5601"
       cap-add:

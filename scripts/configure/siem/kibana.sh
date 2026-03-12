@@ -29,4 +29,32 @@ echo "=== Kibana Network Configuration ==="
 sudo nsenter -t $KIBANA_PID -n ip addr show | grep "inet " || true
 sudo nsenter -t $KIBANA_PID -n ip route show || true
 
+log_info "Writing Kibana configuration..."
+ES_MGMT_HOST="clab-${LAB_NAME}-elasticsearch"
+sudo docker exec -i -e ES_MGMT_HOST="${ES_MGMT_HOST}" "${SIEM_KIBANA_CONTAINER}" sh << 'EOF'
+cat > /usr/share/kibana/config/kibana.yml << KIBANA_CONFIG
+server.host: 0.0.0.0
+server.name: kibana
+elasticsearch.hosts: ["http://${ES_MGMT_HOST}:9200"]
+elasticsearch.requestTimeout: 120000
+elasticsearch.pingTimeout: 30000
+xpack.encryptedSavedObjects.encryptionKey: "a7e4c9f2b8d3e1a6c5f8b2d9e4a7c1f3"
+xpack.reporting.encryptionKey: "b8f3d2e9a1c7f4e6d3b9a2c8f1e5d7a4"
+xpack.security.encryptionKey: "c1f8e3d7a9b4f2e6c8d1a5f9e2b7c4d3"
+telemetry.optIn: false
+KIBANA_CONFIG
+EOF
+
+log_info "Restarting Kibana..."
+sudo docker restart "${SIEM_KIBANA_CONTAINER}" >/dev/null
+
+log_info "Waiting for Kibana to become available..."
+for _ in {1..60}; do
+	if sudo docker logs "${SIEM_KIBANA_CONTAINER}" 2>&1 | tail -n 200 | grep -q "Kibana is now available"; then
+		log_ok "Kibana is available"
+		break
+	fi
+	sleep 2
+done
+
 log_ok "Kibana configured"

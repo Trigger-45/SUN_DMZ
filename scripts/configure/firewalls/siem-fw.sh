@@ -121,10 +121,10 @@ iptables -A FORWARD -s "${SIEM_LOGSTASH_ETH1_IP%/*}" -d "${SIEM_ELASTIC_ETH1_IP%
 iptables -A FORWARD -s "${SIEM_KIBANA_ETH1_IP%/*}" -d "${SIEM_ELASTIC_ETH1_IP%/*}" -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
 iptables -A FORWARD -s "${SIEM_KIBANA_ETH2_IP%/*}" -d "${SIEM_ELASTIC_ETH1_IP%/*}" -p tcp --dport 9200 -m conntrack --ctstate NEW -j ACCEPT
 
-# 6. IDS → Logstash (Port 5044)
-iptables -A FORWARD -s "${IDS_DMZ_ETH2_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
-iptables -A FORWARD -s "${SIEM_KIBANA_ETH1_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
-iptables -A FORWARD -s "${DMZ_WAF_ETH3_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5044 -m conntrack --ctstate NEW -j ACCEPT
+# 6. IDS → Logstash (Port 5045 for IDS/suricata logs)
+iptables -A FORWARD -s "${IDS_DMZ_ETH2_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5045 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s "${SIEM_KIBANA_ETH1_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5045 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -s "${DMZ_WAF_ETH3_IP%/*}" -d "${SIEM_LOGSTASH_ETH1_IP%/*}" -p tcp --dport 5045 -m conntrack --ctstate NEW -j ACCEPT
 
 # 7.  Established/Related connections
 iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT

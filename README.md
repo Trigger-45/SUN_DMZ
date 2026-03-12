@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🛡️ SUN_DMZ – Enterprise Network Security Lab
+# SUN_DMZ – Enterprise Network Security Lab
 
 **Fully containerized enterprise network environment with DMZ architecture, multi-tier firewalls, Suricata IDS, and ELK SIEM stack — automated with Containerlab.**
 
@@ -16,11 +16,11 @@
 
 </div>
 
-> 🎓 **Originally a university project** — Initially built as a graded assignment in system administration and network security.  
-> 🚀 **Actively maintained** — Continued development driven by personal interest in security research and hands-on learning.
+> **Originally a university project** — Initially built as a graded assignment in system administration and network security.  
+> **Actively maintained** — Continued development driven by personal interest in security research and hands-on learning.
 
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#-overview)
 - [Architecture](#-architecture)
@@ -37,7 +37,7 @@
 
 ---
 
-## 🎯 Overview
+## Overview
 
 **SUN_DMZ** is a one-command deployment tool that creates a complete enterprise network environment using [Containerlab](https://containerlab.dev/). It simulates a realistic corporate infrastructure across four network segments:
 
@@ -49,15 +49,15 @@
 | **Internet / Edge** | `200.168.1.0/24` | Simulated internet with attacker node |
 
 Perfect for:
-- 🎓 Security training and education
-- 🔍 Penetration testing practice
-- 📝 IDS/IPS rule development
-- 📊 SIEM log analysis and dashboarding
-- 🔬 Network forensics
+- Security training and education
+- Penetration testing practice
+- IDS/IPS rule development
+- SIEM log analysis and dashboarding
+- Network forensics
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
                         ┌─────────────┐
@@ -115,27 +115,27 @@ Perfect for:
 
 ---
 
-## ✨ Features
+## Features
 
-### 🔒 Network Security
+### Network Security
 - **Multi-tier firewall architecture** — Internal FW, External FW, SIEM FW (iptables + NFLOG)
 - **Intrusion detection** — Suricata IDS in DMZ and internal network (traffic mirroring via bridge)
 - **Web Application Firewall** — OWASP ModSecurity CRS with NGINX reverse proxy
 - **Network segmentation** — Strict isolation between Internet, DMZ, internal, and SIEM zones
 
-### 🌐 Application Stack
+### Application Stack
 - **Vulnerable web application** — Flask + PostgreSQL with login system and role-based access
 - **Reverse proxy** with SSL/TLS termination
 - **Database** — PostgreSQL 16 with sample data (users, reports, access control)
 
-### 📊 Security Monitoring (SIEM)
+### Security Monitoring (SIEM)
 - **Elasticsearch 9.2.1** — Centralized log storage and search
 - **Logstash** — Log ingestion with separate pipelines for firewall and IDS logs
 - **Kibana** — Visualization, dashboards, and analysis
 - **Filebeat** — Log shipping from firewalls and IDS nodes
 - **ulogd2** — Firewall logging via NFLOG
 
-### ⚙️ Automation
+### Automation
 - **One-command deployment** — Entire environment with a single command
 - **Modular design** — Separate scripts per component
 - **Automated cleanup** — Clean teardown of the entire lab
@@ -143,7 +143,7 @@ Perfect for:
 
 ---
 
-## 📦 Prerequisites
+## Prerequisites
 
 | Software | Version | Description |
 |----------|---------|-------------|
@@ -160,7 +160,7 @@ bash install_dependencies.sh
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Clone the repository
@@ -185,7 +185,7 @@ After deployment, the following services are accessible:
 
 ---
 
-## 🔧 Usage
+## Usage
 
 ```bash
 # Full deployment (default)
@@ -212,7 +212,7 @@ sudo containerlab inspect --topo topology/DMZ.yml
 
 ---
 
-## 🗺️ Network Topology
+## Network Topology
 
 ### Subnets
 
@@ -252,7 +252,7 @@ sudo containerlab inspect --topo topology/DMZ.yml
 
 ---
 
-## 🧩 Components
+## Components
 
 ### Firewalls
 
@@ -280,7 +280,7 @@ sudo containerlab inspect --topo topology/DMZ.yml
 
 ---
 
-## ⚔️ Attack Scenarios
+## Attack Scenarios
 
 Pre-configured scripts in the `attacks/` directory:
 
@@ -311,22 +311,22 @@ All attacks generate logs that are ingested through the SIEM pipeline into Elast
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 bash scripts/tests/test-connectivity.sh
 ```
 
 The test suite verifies:
-- ✅ Network connectivity between all segments
-- ✅ Service availability (Elasticsearch, Kibana, Logstash)
-- ✅ Running processes (Filebeat, Suricata, ulogd2)
-- ✅ Firewall rules (default DROP policies)
-- ✅ WAF functionality (ModSecurity active)
+- Network connectivity between all segments
+- Service availability (Elasticsearch, Kibana, Logstash)
+- Running processes (Filebeat, Suricata, ulogd2)
+- Firewall rules (default DROP policies)
+- WAF functionality (ModSecurity active)
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 SUN_DMZ/
@@ -363,6 +363,6 @@ SUN_DMZ/
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).

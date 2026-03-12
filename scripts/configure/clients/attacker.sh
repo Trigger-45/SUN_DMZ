@@ -17,8 +17,8 @@ sudo docker exec -i \
     "clab-${LAB_NAME}-Attacker" sh << 'EOF'
     
 set -e
-apt update >/dev/null 2>&1 || true
-apt-get install -y iproute2 iputils-ping curl hping3 python3 >/dev/null 2>&1 || true
+apt update >/dev/null 2>&1 
+apt-get install -y iproute2 iputils-ping curl hping3 python3 >/dev/null 2>&1 
 ip addr add ${INTERNET_ATTACKER_ETH1_IP} dev eth1 || true
 ip link set eth1 up
 ip route replace default via ${ROUTER_INTERNET_ETH1_IP%/*} || true
