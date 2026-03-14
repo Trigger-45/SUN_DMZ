@@ -45,7 +45,7 @@
 |---------|--------|-------------|
 | **Internal** | `192.168.10.0/24` | Corporate LAN with client machines |
 | **DMZ** | `10.0.2.0/24` | Demilitarized zone with web server, WAF & database |
-| **SIEM** | `10.0.3.0/24` | Security monitoring with full ELK stack |
+| **SIEM** | `10.0.3.0/30` | Security monitoring with full ELK stack |
 | **Internet / Edge** | `200.168.1.0/24` | Simulated internet with attacker node |
 
 Perfect for:
@@ -102,7 +102,7 @@ Perfect for:
                         │         │
                     ┌───┴─────────┴───┐
                     │    SIEM FW      │
-                    │  10.0.3.0/24    │
+                    │  10.0.3.0/30    │
                     └───┬───┬───┬─────┘
                         │   │   │
               ┌─────────┘   │   └─────────┐
@@ -180,8 +180,7 @@ After deployment, the following services are accessible:
 |---------|-----|-------------|
 | **Kibana** | `http://localhost:5601` | SIEM Dashboard |
 | **Elasticsearch** | `http://localhost:9200` | Search API |
-| **Web App (WAF)** | `http://localhost:8181` | Web application via ModSecurity |
-| **PostgreSQL** | `localhost:3636` | Database |
+| **Web App (WAF)** | `http://localhost:8080` | Web application via ModSecurity |
 
 ---
 
