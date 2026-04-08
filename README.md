@@ -1,6 +1,6 @@
 <div align="center">
 
-# SUN_DMZ – Enterprise Network Security Lab
+# DMZ – Enterprise Network Security Lab
 
 **Fully containerized enterprise network environment with DMZ architecture, multi-tier firewalls, Suricata IDS, and ELK SIEM stack — automated with Containerlab.**
 
@@ -16,7 +16,7 @@
 
 </div>
 
-> **Originally a university project** — Initially built as a graded assignment in system administration and network security.  
+> **Originally a university project** — Initially built as a graded assignment for the university.  
 > **Actively maintained** — Continued development driven by personal interest in security research and hands-on learning.
 
 
@@ -39,7 +39,7 @@
 
 ## Overview
 
-**SUN_DMZ** is a one-command deployment tool that creates a complete enterprise network environment using [Containerlab](https://containerlab.dev/). It simulates a realistic corporate infrastructure across four network segments:
+**DMZ** is a one-command deployment tool that creates a complete enterprise network environment using [Containerlab](https://containerlab.dev/). It simulates a realistic corporate infrastructure across four network segments:
 
 | Segment | Subnet | Description |
 |---------|--------|-------------|
@@ -164,8 +164,8 @@ bash install_dependencies.sh
 
 ```bash
 # Clone the repository
-git clone https://github.com/Trigger-45/SUN_DMZ.git
-cd SUN_DMZ
+git clone https://github.com/Trigger-45DMZ.git
+cd DMZ
 
 # Install dependencies (one-time)
 bash install_dependencies.sh
@@ -328,7 +328,7 @@ The test suite verifies:
 ## Project Structure
 
 ```
-SUN_DMZ/
+DMZ/
 ├── main.sh                       # Main entry point
 ├── install_dependencies.sh       # Dependency installer
 ├── attacks/                      # Pre-configured attack scripts
