@@ -81,7 +81,7 @@ fi
 # =========================
 # Main Deployment Flow
 # =========================
-log_section "Starting SUN_DMZ Deployment"
+log_section "Starting DMZ Deployment"
 
 if [ "$SKIP_CLEANUP" = false ]; then
     log_info "Running cleanup phase..."

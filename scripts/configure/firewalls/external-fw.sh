@@ -207,41 +207,41 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED \
 iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
 # ============================================
-# Internet → Webserver (Port 8443) with DDoS Protection
+# Internet -> Webserver (post-DNAT target port 8080) with DDoS Protection
 # ============================================
 
 # Per-IP rate limiting: max 20 new connections per minute
-iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 \
 	-m conntrack --ctstate NEW \
 	-m recent --name webserver_dos --set
 
-iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 \
 	-m conntrack --ctstate NEW \
 	-m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-DOS-BLOCK] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 \
 	-m conntrack --ctstate NEW \
 	-m recent --name webserver_dos --update --seconds 60 --hitcount 20 \
 	-j DROP
 
 # Global rate limit: 50 connections/sec per source
-iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 \
 	-m conntrack --ctstate NEW \
 	-m limit --limit 50/sec --limit-burst 100 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-ACCEPT] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 \
 	-m conntrack --ctstate NEW \
 	-m limit --limit 50/sec --limit-burst 100 \
 	-j ACCEPT
 
 # Anything over limit gets dropped
-iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 \
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 \
 	-m limit --limit 1000/min --limit-burst 2000 \
 	-j NFLOG --nflog-prefix "[EXT-FW-WEB-RATELIMIT-DROP] " --nflog-group 0
 
-iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8443 -j DROP
+iptables -A FORWARD -i eth2 -o eth1 -d "${DMZ_WAF_ETH1_IP%/*}" -p tcp --dport 8080 -j DROP
 
 # ============================================
 # Internet → Webserver (ICMP) with rate limiting
